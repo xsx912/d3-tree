@@ -1,0 +1,31 @@
+{
+  "name": "@d3-tree/core",
+  "version": "0.1.0",
+  "description": "框架无关的 d3 v7 双向树图谱核心（根居中、左右展开）",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "d3": "^7.9.0"
+  },
+  "devDependencies": {
+    "@types/d3": "^7.4.3",
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0",
+    "jsdom": "^26.0.0"
+  }
+}

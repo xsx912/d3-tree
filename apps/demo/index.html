@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>双向树图谱 · 原生</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #fff; }
+      header {
+        display: flex; align-items: center; gap: 16px;
+        padding: 10px 20px; border-bottom: 1px solid #EBEEF5;
+      }
+      header h1 { font-size: 16px; color: #303133; font-weight: 600; }
+      nav a { font-size: 13px; color: #1E6EFF; text-decoration: none; margin-right: 12px; }
+      nav a:hover { text-decoration: underline; }
+      #chart { width: 100vw; height: calc(100vh - 46px); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>双向树图谱 · 产业链示例</h1>
+      <nav>
+        <a href="/index.html">原生</a>
+        <a href="/vue.html">Vue</a>
+        <a href="/react.html">React</a>
+      </nav>
+    </header>
+    <div id="chart"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
