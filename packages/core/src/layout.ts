@@ -58,9 +58,9 @@ export interface LayoutConfig {
   columnGap: number
 }
 
-function buildDisplay(node: TreeNodeData): DisplayNode {
-  if (!node.collapsed && node.children?.length) {
-    return { original: node, children: node.children.map(buildDisplay) }
+function buildDisplay(node: TreeNodeData, collapsedIds: Set<string>): DisplayNode {
+  if (!collapsedIds.has(node.id) && node.children?.length) {
+    return { original: node, children: node.children.map(c => buildDisplay(c, collapsedIds)) }
   }
   return { original: node }
 }
@@ -78,7 +78,11 @@ export function splitSides(root: TreeNodeData): { left: TreeNodeData[]; right: T
   return { left, right }
 }
 
-export function computeLayout(rootData: TreeNodeData, config: LayoutConfig): LayoutResult {
+export function computeLayout(
+  rootData: TreeNodeData,
+  config: LayoutConfig,
+  collapsedIds: Set<string> = new Set(),
+): LayoutResult {
   const { measureText, rowHeight, columnGap } = config
   const nodes: LayoutNode[] = []
   const links: LayoutLink[] = []
@@ -109,7 +113,7 @@ export function computeLayout(rootData: TreeNodeData, config: LayoutConfig): Lay
     // 合成侧根：不可渲染，仅用于让 d3.tree 以根为 (0,0) 展开一侧子树
     const synthetic: DisplayNode = {
       original: rootData,
-      children: sideChildren.map(buildDisplay),
+      children: sideChildren.map(c => buildDisplay(c, collapsedIds)),
     }
     const h = hierarchy<DisplayNode>(synthetic, d => d.children)
     const laidOut = tree<DisplayNode>()
@@ -186,4 +190,12 @@ export function linkPath(link: LayoutLink, columnGap: number, style: LinkStyle):
   }
   const busX = tx - (dir * columnGap) / 2
   return `M${sx},${source.y}H${busX}V${target.y}H${tx}`
+}
+
+/** 退化为一点的连线路径（enter 自源点长出 / exit 收拢回源点）。命令结构与 linkPath 一致，保证过渡可数值插值 */
+export function degenerateLinkPath(at: { x: number; y: number }, style: LinkStyle): string {
+  if (style === 'diagonal') {
+    return `M${at.x},${at.y}C${at.x},${at.y} ${at.x},${at.y} ${at.x},${at.y}`
+  }
+  return `M${at.x},${at.y}H${at.x}V${at.y}H${at.x}`
 }

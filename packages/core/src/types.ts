@@ -57,6 +57,8 @@ export interface TreeOptions {
 export interface TreeInstance {
   /** 整体替换数据并过渡到新布局 */
   setData(data: TreeNodeData): void
+  /** 切换指定节点的折叠态（根节点不可折叠） */
+  toggle(id: string): void
   /** 移除 SVG 与全部监听 */
   destroy(): void
 }
