@@ -50,6 +50,7 @@ Status: ready-for-agent
 28. 作为开发者，我希望包为 ESM + 完整 d.ts 类型，以便 TS 项目获得类型提示。
 29. 作为维护者，我希望纯逻辑（布局数学、聚合分批、增删）先有测试再有实现（TDD），以便回归有兜底。
 30. 作为维护者，我希望 demo 三页共享同一示例数据与工具栏，以便三种接入方式效果可直接对照。
+31. 作为图谱观看者，我希望选择垂直布局（根居中、子树分上半区/下半区纵向展开），以便在左右窄长的画布中呈现双向树（2026-10-08 增补）。
 
 ## Implementation Decisions
 
@@ -68,6 +69,7 @@ Status: ready-for-agent
 - **导出**：SVG 序列化（克隆节点内联计算样式）下载；PNG 将 SVG 转 blob→Image→canvas（2x scale）→ dataURL 下载。
 - **增删**：`addChild(parentId, node, side?)` 定位父节点（含折叠态自动展开）插入并重排过渡；`removeChild(id)` 移除并收拢。
 - **封装**：Vue 3 `<script setup>` 组件，watch props 变化映射到对应命令；React 18 函数组件 forwardRef，props diff 后调用命令；二者 ref 均暴露 core 实例的命令方法子集。
+- **布局方向**：`orientation: 'horizontal' | 'vertical'`，默认 horizontal（向后兼容）。垂直 = 水平的坐标转置：根居中，side 语义映射为上半区（原 left）/下半区（原 right），深度沿 y 轴分"行"对齐（行起点 = 前序各行最大高度累计 + columnGap），兄弟沿 x 轴以 rowHeight 排布；直角折线转为 垂直-水平-垂直；徽标置于节点上（上半区）/下（下半区）外侧；聚合箭头上半区 `↑ 展开 (N)`、下半区 `展开 (N) ↓`。zoomToFit/搜索定位的居中公式按轴独立，无需分支。
 - **单缝原则**：对外测试缝只有 `createBidirectionalTree` 公共 API（jsdom 环境），布局/聚合等纯函数不导出。
 
 ## Testing Decisions
@@ -85,7 +87,7 @@ Status: ready-for-agent
 - 真实后端 API 集成（loadChildren 仅留回调缝，demo 用本地数据）。
 - i18n（库无内嵌文案；demo 文案为中文）。
 - 发布到 npm registry（产物就绪，不执行发布）。
-- 竖向（top-down）布局方向。
+- 经典自顶向下单向布局（垂直形态采用上下分侧双向，2026-10-08 增补）。
 
 ## Further Notes
 

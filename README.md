@@ -13,6 +13,7 @@
 **特性**
 
 - 双向布局：变宽圆角矩形节点、按列对齐、直角折线连线（可选贝塞尔）、左半区徽标在左/右半区在右
+- 双方向：`orientation: 'horizontal'`（左右分侧，默认）或 `'vertical'`（上下分侧，水平布局的坐标转置；兄弟间距按节点宽度自适应防叠边）
 - 折叠展开：对齐官方 [collapsible-tree](https://observablehq.com/@d3/collapsible-tree)（250ms 过渡，子树自点击处长出/回拢），节点本体与 +/− 徽标均可点击
 - 懒加载聚合：子节点超限聚合为"展开 (N)"分批释放，`loadChildren` 异步回调缝可接远程 API
 - 缩放平移 + `zoomToFit`；分组着色 + tooltip + 图例筛选；搜索高亮定位（含祖先链）；导出 PNG/SVG；编程式增删节点
@@ -122,6 +123,7 @@ interface TreeNodeData {
 | `columnGap` | `number` / `48` | 深度列水平间距 |
 | `visibleChildrenLimit` | `number` / `5` | 每父节点可见子节点上限，超出聚合"展开 (N)"；`0` 不聚合 |
 | `linkStyle` | `'orthogonal' \| 'diagonal'` / `'orthogonal'` | 连线：直角折线 / 贝塞尔 |
+| `orientation` | `'horizontal' \| 'vertical'` / `'horizontal'` | 布局方向：左右分侧 / 上下分侧（垂直下 rowHeight/columnGap 语义对调：兄弟间距/深度行距） |
 | `colorByGroup` | `boolean` / `false` | 按 group 调色板着色（白字） |
 | `nodeColor` | `(node) => string` | 自定义节点填充，优先于分组色 |
 | `tooltip.formatter` | `(node) => string` | tooltip HTML 内容（默认名称 + properties 键值表，自动转义） |

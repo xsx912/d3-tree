@@ -10,6 +10,7 @@ import type {
   NodeRenderer,
   NodeSizeFn,
   NodeTemplate,
+  Orientation,
   TextMeasurer,
   TreeInstance,
   TreeNodeData,
@@ -105,6 +106,7 @@ export function createBidirectionalTree(
   const rowHeight = options.rowHeight ?? 48
   const columnGap = options.columnGap ?? 48
   const linkStyle: LinkStyle = options.linkStyle ?? 'orthogonal'
+  const orientation: Orientation = options.orientation ?? 'horizontal'
   const visibleChildrenLimit = options.visibleChildrenLimit ?? 5
   const measureText: TextMeasurer = options.measureText ?? createCanvasMeasurer()
   /** 节点几何来源：默认文字度量宽 + 内置高度；nodeSize 完全接管 */
@@ -473,8 +475,15 @@ export function createBidirectionalTree(
   }
 
   function badgeCenterX(d: LayoutNode): number {
+    if (orientation === 'vertical') return 0
     const dir = d.side === 'left' ? -1 : 1
     return dir * (d.width / 2 + theme.badgeRadius + 3)
+  }
+
+  function badgeCenterY(d: LayoutNode): number {
+    if (orientation !== 'vertical') return 0
+    const dir = d.side === 'left' ? -1 : 1
+    return dir * (d.height / 2 + theme.badgeRadius + 3)
   }
 
   /** 官方 collapsible-tree 模式：翻转折叠态后以被点击节点为动画源重绘 */
@@ -534,7 +543,7 @@ export function createBidirectionalTree(
   function currentLayout(): LayoutResult {
     return computeLayout(
       currentData,
-      { measureText, rowHeight, columnGap, nodeSize: sizeOf },
+      { measureText, rowHeight, columnGap, nodeSize: sizeOf, orientation },
       collapsedIds,
       { limit: visibleChildrenLimit, revealed },
       visibleGroups,
@@ -563,7 +572,7 @@ export function createBidirectionalTree(
         .exit<LayoutLink>()
         .transition()
         .duration(duration)
-        .attr('d', d => degenerateLinkPath(end, linkStyle))
+        .attr('d', d => degenerateLinkPath(end, linkStyle, orientation))
         .remove()
     } else {
       link.exit<LayoutLink>().remove()
@@ -573,15 +582,15 @@ export function createBidirectionalTree(
       .enter()
       .append('path')
       .attr('class', 'd3t-link')
-      .attr('d', () => (animate ? degenerateLinkPath(start, linkStyle) : ''))
+      .attr('d', () => (animate ? degenerateLinkPath(start, linkStyle, orientation) : ''))
     const linkMerged = linkEnter.merge(link)
     if (animate) {
       linkMerged
         .transition()
         .duration(duration)
-        .attr('d', d => linkPath(d, columnGap, linkStyle))
+        .attr('d', d => linkPath(d, columnGap, linkStyle, orientation))
     } else {
-      linkMerged.attr('d', d => linkPath(d, columnGap, linkStyle))
+      linkMerged.attr('d', d => linkPath(d, columnGap, linkStyle, orientation))
     }
 
     // ---- 节点 ----
@@ -671,7 +680,7 @@ export function createBidirectionalTree(
       .attr('class', 'd3t-badge-circle')
       .attr('r', theme.badgeRadius)
       .attr('cx', badgeCenterX)
-      .attr('cy', 0)
+      .attr('cy', badgeCenterY)
       .attr('fill', theme.badgeFill)
       .attr('stroke', theme.badgeStroke)
       .attr('stroke-width', 1)
@@ -681,7 +690,7 @@ export function createBidirectionalTree(
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central')
       .attr('x', badgeCenterX)
-      .attr('y', 0)
+      .attr('y', badgeCenterY)
       .attr('font-size', 12)
       .attr('font-weight', 'bold')
       .attr('fill', theme.badgeText)

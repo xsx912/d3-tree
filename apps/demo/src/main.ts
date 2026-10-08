@@ -21,6 +21,7 @@ const defaultHint = '点击节点可折叠/展开；滚轮缩放、拖拽平移'
 const legendEl = document.querySelector<HTMLDivElement>('#legend')!
 const activeGroups = new Set<string>()
 
+let orientation: 'horizontal' | 'vertical' = 'horizontal'
 const options = {
   data: industryData,
   colorByGroup: true,
@@ -47,7 +48,7 @@ const options = {
   },
 }
 
-const tree: TreeInstance = createBidirectionalTree(container, options)
+let tree: TreeInstance = createBidirectionalTree(container, options)
 
 function setMode(next: PickMode): void {
   mode = next
@@ -131,5 +132,14 @@ document.querySelector<HTMLButtonElement>('#btn-collapse')!.addEventListener('cl
   tree.zoomToFit()
 })
 document.querySelector<HTMLButtonElement>('#btn-fit')!.addEventListener('click', () => {
+  tree.zoomToFit()
+})
+const orientBtn = document.querySelector<HTMLButtonElement>('#btn-orient')!
+orientBtn.addEventListener('click', () => {
+  orientation = orientation === 'horizontal' ? 'vertical' : 'horizontal'
+  orientBtn.textContent = orientation === 'horizontal' ? '垂直布局' : '水平布局'
+  tree.destroy()
+  ;(options as { orientation?: 'horizontal' | 'vertical' }).orientation = orientation
+  tree = createBidirectionalTree(container, options)
   tree.zoomToFit()
 })

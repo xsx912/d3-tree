@@ -8,6 +8,7 @@ export type {
   NodeSizeFn,
   NodeTemplate,
   NodeVariant,
+  Orientation,
   Side,
   TextMeasurer,
   TooltipOptions,

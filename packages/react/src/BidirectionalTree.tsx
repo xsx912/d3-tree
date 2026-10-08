@@ -5,6 +5,7 @@ import type {
   ExportImageOptions,
   LinkStyle,
   NodeRenderer,
+  Orientation,
   NodeSizeFn,
   NodeTemplate,
   Side,
@@ -20,6 +21,7 @@ export interface BidirectionalTreeProps {
   columnGap?: number
   visibleChildrenLimit?: number
   linkStyle?: LinkStyle
+  orientation?: Orientation
   colorByGroup?: boolean
   /** 点击节点本体是否触发折叠切换；选取/编辑模式可置 false */
   toggleOnNodeClick?: boolean
@@ -76,6 +78,7 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       columnGap,
       visibleChildrenLimit,
       linkStyle,
+      orientation,
       colorByGroup,
       nodeSize,
       nodeRenderer,
@@ -94,6 +97,7 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
         columnGap,
         visibleChildrenLimit,
         linkStyle,
+        orientation,
         colorByGroup,
         nodeSize,
         nodeRenderer,
@@ -121,6 +125,8 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       columnGap,
       visibleChildrenLimit,
       linkStyle,
+      orientation,
+      orientation,
       colorByGroup,
       nodeSize,
       nodeRenderer,

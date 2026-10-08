@@ -4,6 +4,7 @@ import type {
   LinkStyle,
   NodeSizeFn,
   NodeVariant,
+  Orientation,
   Side,
   TextMeasurer,
   TreeNodeData,
@@ -74,6 +75,8 @@ export interface LayoutConfig {
   columnGap: number
   /** 节点几何来源（chart 层默认：文字度量宽 + 内置高度） */
   nodeSize: NodeSizeFn
+  /** 布局方向：垂直 = 水平的坐标转置（上下分侧） */
+  orientation: Orientation
 }
 
 function buildDisplay(
@@ -82,6 +85,7 @@ function buildDisplay(
   agg: AggregateConfig,
   side: 'left' | 'right',
   visibleGroups: Set<string> | null,
+  orientation: Orientation,
 ): DisplayNode | null {
   // 分组过滤：未命中分组的节点连同其整棵子树一并隐藏（未分组节点不受影响）
   if (visibleGroups && node.group && !visibleGroups.has(node.group)) return null
@@ -94,12 +98,19 @@ function buildDisplay(
       visible = children.slice(0, take)
       const remaining = children.length - visible.length
       if (remaining > 0) {
-        const name = side === 'left' ? `< 展开 (${remaining})` : `展开 (${remaining}) >`
+        const name =
+          orientation === 'vertical'
+            ? side === 'left'
+              ? `↑ 展开 (${remaining})`
+              : `展开 (${remaining}) ↓`
+            : side === 'left'
+              ? `< 展开 (${remaining})`
+              : `展开 (${remaining}) >`
         aggregate = { original: { id: `__agg__${node.id}`, name } }
       }
     }
     const childNodes = visible
-      .map(c => buildDisplay(c, collapsedIds, agg, side, visibleGroups))
+      .map(c => buildDisplay(c, collapsedIds, agg, side, visibleGroups, orientation))
       .filter((n): n is DisplayNode => n !== null)
     return {
       original: node,
@@ -107,6 +118,20 @@ function buildDisplay(
     }
   }
   return { original: node }
+}
+
+/** 相邻兄弟在兄弟轴上的最小附加间隙 */
+const SIBLING_MIN_GAP = 12
+
+/** 兄弟轴上的节点尺寸：水平模式兄弟沿 y（用高度），垂直模式兄弟沿 x（用宽度） */
+function siblingAxisSpan(
+  node: DisplayNode,
+  nodeSize: NodeSizeFn,
+  vertical: boolean,
+): number {
+  const variant: NodeVariant = node.aggregate === true ? 'aggregate' : 'node'
+  const s = nodeSize(node.original, variant)
+  return vertical ? s.width : s.height
 }
 
 /** 根的直接子节点分侧：显式 side 优先，缺省前一半 left、后一半 right */
@@ -129,7 +154,8 @@ export function computeLayout(
   agg: AggregateConfig = { limit: 0, revealed: new Map() },
   visibleGroups: Set<string> | null = null,
 ): LayoutResult {
-  const { nodeSize, rowHeight, columnGap } = config
+  const { nodeSize, rowHeight, columnGap, orientation } = config
+  const vertical = orientation === 'vertical'
   const nodes: LayoutNode[] = []
   const links: LayoutLink[] = []
   const byId = new Map<string, LayoutNode>()
@@ -161,24 +187,38 @@ export function computeLayout(
     const synthetic: DisplayNode = {
       original: rootData,
       children: sideChildren
-        .map(c => buildDisplay(c, collapsedIds, agg, side, visibleGroups))
+        .map(c => buildDisplay(c, collapsedIds, agg, side, visibleGroups, orientation))
         .filter((n): n is DisplayNode => n !== null),
     }
     const h = hierarchy<DisplayNode>(synthetic, d => d.children)
     const laidOut = tree<DisplayNode>()
       .nodeSize([rowHeight, 1])
-      .separation(() => 1)(h)
+      // 相邻中心距需覆盖两节点在兄弟轴上的半尺寸和 + 最小间隙；不足 rowHeight 时钳回 1
+      // （水平模式节点高 34 < 48 → 恒为 1，既有布局零变化；垂直模式按宽度自动撑开防叠边）
+      .separation((a, b) =>
+        Math.max(
+          1,
+          (siblingAxisSpan(a.data, nodeSize, vertical) / 2 +
+            siblingAxisSpan(b.data, nodeSize, vertical) / 2 +
+            SIBLING_MIN_GAP) /
+            rowHeight,
+        ),
+      )(h)
 
-    // 各深度列的最大节点宽 → 列起点（距中心的绝对距离）
+    // 深度轴尺寸：水平=节点宽（列宽），垂直=节点高（行高）→ 累计出各深度列/行起点
+    const depthAxis = (d: TreeNodeData, variant: LayoutNode['variant']): number => {
+      const s = nodeSize(d, variant)
+      return vertical ? s.height : s.width
+    }
     const colMax = new Map<number, number>()
     laidOut.each(n => {
       if (n.depth === 0) return
       const variant: LayoutNode['variant'] = n.data.aggregate === true ? 'aggregate' : 'node'
-      const w = nodeSize(n.data.original, variant).width
-      colMax.set(n.depth, Math.max(colMax.get(n.depth) ?? 0, w))
+      const size = depthAxis(n.data.original, variant)
+      colMax.set(n.depth, Math.max(colMax.get(n.depth) ?? 0, size))
     })
     const colEdge = new Map<number, number>()
-    let edge = rootNode.width / 2 + columnGap
+    let edge = (vertical ? rootNode.height : rootNode.width) / 2 + columnGap
     for (const depth of [...colMax.keys()].sort((a, b) => a - b)) {
       colEdge.set(depth, edge)
       edge += (colMax.get(depth) ?? 0) + columnGap
@@ -189,9 +229,9 @@ export function computeLayout(
       const d = n.data.original
       const variant: LayoutNode['variant'] = n.data.aggregate === true ? 'aggregate' : 'node'
       const size = nodeSize(d, variant)
-      const width = size.width
+      const depthSpan = depthAxis(d, variant)
       const columnStart = colEdge.get(n.depth) ?? 0
-      const center = side === 'right' ? columnStart + width / 2 : -(columnStart + width / 2)
+      const center = side === 'right' ? columnStart + depthSpan / 2 : -(columnStart + depthSpan / 2)
       const parentId =
         n.parent && n.parent.depth === 0 ? rootData.id : (n.parent?.data.original.id ?? rootData.id)
 
@@ -202,10 +242,11 @@ export function computeLayout(
         name: d.name,
         side,
         depth: n.depth,
-        width,
+        width: size.width,
         height: size.height,
-        x: center,
-        y: n.x,
+        // 水平：深度沿 x（分侧取号）、兄弟沿 y；垂直：坐标转置（left=上半区 y 取负）
+        x: vertical ? n.x : center,
+        y: vertical ? center : n.x,
         parentId,
       }
       nodes.push(node)
@@ -230,10 +271,25 @@ export function computeLayout(
   return { nodes, links, bounds: { minX, maxX, minY, maxY } }
 }
 
-/** 连线路径：直角折线（父边 → 公共竖线 → 子边）或贝塞尔对角线 */
-export function linkPath(link: LayoutLink, columnGap: number, style: LinkStyle): string {
+/** 连线路径：直角折线（父边 → 公共竖线/横线 → 子边）或贝塞尔对角线；方向随 orientation 转置 */
+export function linkPath(
+  link: LayoutLink,
+  columnGap: number,
+  style: LinkStyle,
+  orientation: Orientation = 'horizontal',
+): string {
   const { source, target } = link
   const dir = target.side === 'left' ? -1 : 1
+  if (orientation === 'vertical') {
+    const sy = source.y + (dir * source.height) / 2
+    const ty = target.y - (dir * target.height) / 2
+    if (style === 'diagonal') {
+      const my = (sy + ty) / 2
+      return `M${source.x},${sy}C${source.x},${my} ${target.x},${my} ${target.x},${ty}`
+    }
+    const busY = ty - (dir * columnGap) / 2
+    return `M${source.x},${sy}V${busY}H${target.x}V${ty}`
+  }
   const sx = source.x + (dir * source.width) / 2
   const tx = target.x - (dir * target.width) / 2
   if (style === 'diagonal') {
@@ -245,9 +301,15 @@ export function linkPath(link: LayoutLink, columnGap: number, style: LinkStyle):
 }
 
 /** 退化为一点的连线路径（enter 自源点长出 / exit 收拢回源点）。命令结构与 linkPath 一致，保证过渡可数值插值 */
-export function degenerateLinkPath(at: { x: number; y: number }, style: LinkStyle): string {
+export function degenerateLinkPath(
+  at: { x: number; y: number },
+  style: LinkStyle,
+  orientation: Orientation = 'horizontal',
+): string {
   if (style === 'diagonal') {
     return `M${at.x},${at.y}C${at.x},${at.y} ${at.x},${at.y} ${at.x},${at.y}`
   }
-  return `M${at.x},${at.y}H${at.x}V${at.y}H${at.x}`
+  return orientation === 'vertical'
+    ? `M${at.x},${at.y}V${at.y}H${at.x}V${at.y}`
+    : `M${at.x},${at.y}H${at.x}V${at.y}H${at.x}`
 }

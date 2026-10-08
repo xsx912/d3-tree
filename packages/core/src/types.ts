@@ -24,6 +24,9 @@ export type TextMeasurer = (text: string, variant: NodeVariant) => number
 
 export type LinkStyle = 'orthogonal' | 'diagonal'
 
+/** 布局方向：水平（左右分侧，默认）或垂直（上下分侧） */
+export type Orientation = 'horizontal' | 'vertical'
+
 /** 节点几何函数：返回节点宽高（坐标系以节点中心为原点） */
 export type NodeSizeFn = (
   data: TreeNodeData,
@@ -64,6 +67,8 @@ export interface TreeOptions {
   visibleChildrenLimit?: number
   /** 连线样式：直角折线（默认）或贝塞尔对角线 */
   linkStyle?: LinkStyle
+  /** 布局方向：水平左右分侧（默认）或垂直上下分侧；垂直模式下 rowHeight/columnGap 语义对调（兄弟间距/深度行距） */
+  orientation?: Orientation
   /** 按 group 字段着色（内置调色板，配白色文字）；默认 false 保持参考稿白节点风格 */
   colorByGroup?: boolean
   /** 节点几何：宽高完全自定义；缺省按内置文字度量（变宽）+ 34/44 高 */
