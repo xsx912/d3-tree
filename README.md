@@ -122,8 +122,11 @@ interface TreeNodeData {
 | `rowHeight` | `number` / `48` | 同层兄弟纵向步距 |
 | `columnGap` | `number` / `48` | 深度列水平间距 |
 | `visibleChildrenLimit` | `number` / `5` | 每父节点可见子节点上限，超出聚合"展开 (N)"；`0` 不聚合 |
-| `linkStyle` | `'orthogonal' \| 'diagonal'` / `'orthogonal'` | 连线：直角折线 / 贝塞尔 |
+| `linkStyle` | `'orthogonal' \| 'diagonal' \| 'straight'` / `'orthogonal'` | 连线：直角折线 / 贝塞尔 / 直线 |
 | `orientation` | `'horizontal' \| 'vertical'` / `'horizontal'` | 布局方向：左右分侧 / 上下分侧（垂直下 rowHeight/columnGap 语义对调：兄弟间距/深度行距） |
+| `linkColor` | `string \| (link) => string` / `'#C0C4CC'` | 连线颜色：颜色串或按连线两端信息（source/target 的 data/几何等）返回 |
+| `linkWidth` | `number` / `1` | 连线宽度（px） |
+| `linkPathGenerator` | `(link) => string` | 完全自定义连线：返回 SVG path 的 d，优先于 linkStyle（不做形变插值） |
 | `colorByGroup` | `boolean` / `false` | 按 group 调色板着色（白字） |
 | `nodeColor` | `(node) => string` | 自定义节点填充，优先于分组色 |
 | `tooltip.formatter` | `(node) => string` | tooltip HTML 内容（默认名称 + properties 键值表，自动转义） |
@@ -175,6 +178,21 @@ nodeTemplate: data => `
 ```
 
 Vue/React 组件以同名 props 透传（`node-size` / `node-renderer` / `node-template`）。
+
+### 连线自定义
+
+```ts
+// 内置三态
+linkStyle: 'straight',                       // 折线 orthogonal（默认）/ 直线 straight / 曲线 diagonal
+
+// 按目标节点分组着色（配合 colorByGroup 图例色）
+linkColor: link => palette[link.target.data.group ?? ''] ?? '#C0C4CC',
+linkWidth: 1.5,
+
+// 完全自定义路径（回调收到 source/target 端点几何与数据，方向感知）
+linkPathGenerator: ({ source, target }) =>
+  `M${source.x},${source.y}Q${(source.x + target.x) / 2},${source.y} ${target.x},${target.y}`,
+```
 
 ## 工程结构与工单
 

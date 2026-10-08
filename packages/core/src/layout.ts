@@ -271,7 +271,7 @@ export function computeLayout(
   return { nodes, links, bounds: { minX, maxX, minY, maxY } }
 }
 
-/** 连线路径：直角折线（父边 → 公共竖线/横线 → 子边）或贝塞尔对角线；方向随 orientation 转置 */
+/** 连线路径：直角折线 / 贝塞尔对角线 / 直线；方向随 orientation 转置 */
 export function linkPath(
   link: LayoutLink,
   columnGap: number,
@@ -287,6 +287,9 @@ export function linkPath(
       const my = (sy + ty) / 2
       return `M${source.x},${sy}C${source.x},${my} ${target.x},${my} ${target.x},${ty}`
     }
+    if (style === 'straight') {
+      return `M${source.x},${sy}L${target.x},${ty}`
+    }
     const busY = ty - (dir * columnGap) / 2
     return `M${source.x},${sy}V${busY}H${target.x}V${ty}`
   }
@@ -295,6 +298,9 @@ export function linkPath(
   if (style === 'diagonal') {
     const mx = (sx + tx) / 2
     return `M${sx},${source.y}C${mx},${source.y} ${mx},${target.y} ${tx},${target.y}`
+  }
+  if (style === 'straight') {
+    return `M${sx},${source.y}L${tx},${target.y}`
   }
   const busX = tx - (dir * columnGap) / 2
   return `M${sx},${source.y}H${busX}V${target.y}H${tx}`
@@ -308,6 +314,9 @@ export function degenerateLinkPath(
 ): string {
   if (style === 'diagonal') {
     return `M${at.x},${at.y}C${at.x},${at.y} ${at.x},${at.y} ${at.x},${at.y}`
+  }
+  if (style === 'straight') {
+    return `M${at.x},${at.y}L${at.x},${at.y}`
   }
   return orientation === 'vertical'
     ? `M${at.x},${at.y}V${at.y}H${at.x}V${at.y}`

@@ -3,6 +3,8 @@ import type { CSSProperties } from 'react'
 import { createBidirectionalTree } from '@d3-tree/core'
 import type {
   ExportImageOptions,
+  LinkColor,
+  LinkRenderContext,
   LinkStyle,
   NodeRenderer,
   Orientation,
@@ -21,6 +23,9 @@ export interface BidirectionalTreeProps {
   columnGap?: number
   visibleChildrenLimit?: number
   linkStyle?: LinkStyle
+  linkColor?: LinkColor
+  linkWidth?: number
+  linkPathGenerator?: (link: LinkRenderContext) => string
   orientation?: Orientation
   colorByGroup?: boolean
   /** 点击节点本体是否触发折叠切换；选取/编辑模式可置 false */
@@ -78,6 +83,9 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       columnGap,
       visibleChildrenLimit,
       linkStyle,
+      linkColor,
+      linkWidth,
+      linkPathGenerator,
       orientation,
       colorByGroup,
       nodeSize,
@@ -97,6 +105,9 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
         columnGap,
         visibleChildrenLimit,
         linkStyle,
+        linkColor,
+        linkWidth,
+        linkPathGenerator,
         orientation,
         colorByGroup,
         nodeSize,
@@ -125,6 +136,9 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       columnGap,
       visibleChildrenLimit,
       linkStyle,
+      linkColor,
+      linkWidth,
+      linkPathGenerator,
       orientation,
       orientation,
       colorByGroup,

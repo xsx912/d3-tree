@@ -5,6 +5,9 @@ import { createCanvasMeasurer } from './measure'
 import { theme } from './theme'
 import type {
   ExportImageOptions,
+  LinkColor,
+  LinkEndpoint,
+  LinkRenderContext,
   LinkStyle,
   NodeRenderContext,
   NodeRenderer,
@@ -134,12 +137,7 @@ export function createBidirectionalTree(
   // 缩放层（承载 zoom 变换）与内容层（承载居中平移）分离，避免变换互相覆盖
   const gZoom = svg.append('g').attr('class', 'd3t-zoom')
   const gChart = gZoom.append('g').attr('class', 'd3t-chart')
-  const gLink = gChart
-    .append('g')
-    .attr('class', 'd3t-links')
-    .attr('fill', 'none')
-    .attr('stroke', theme.link)
-    .attr('stroke-width', theme.linkWidth)
+  const gLink = gChart.append('g').attr('class', 'd3t-links').attr('fill', 'none')
   const gNode = gChart.append('g').attr('class', 'd3t-nodes')
 
   const zoomBehavior = zoom<SVGSVGElement, unknown>()
@@ -474,6 +472,30 @@ export function createBidirectionalTree(
     }
   }
 
+  function toEndpoint(n: LayoutNode): LinkEndpoint {
+    return {
+      data: n.data,
+      variant: n.variant,
+      side: n.side,
+      depth: n.depth,
+      x: n.x,
+      y: n.y,
+      width: n.width,
+      height: n.height,
+    }
+  }
+
+  function toLinkCtx(l: LayoutLink): LinkRenderContext {
+    return { source: toEndpoint(l.source), target: toEndpoint(l.target) }
+  }
+
+  const linkColorOf = (l: LayoutLink): string =>
+    typeof options.linkColor === 'function'
+      ? options.linkColor(toLinkCtx(l))
+      : (options.linkColor ?? theme.link)
+
+  const linkWidthOf = (): number => options.linkWidth ?? theme.linkWidth
+
   function badgeCenterX(d: LayoutNode): number {
     if (orientation === 'vertical') return 0
     const dir = d.side === 'left' ? -1 : 1
@@ -567,12 +589,20 @@ export function createBidirectionalTree(
       .selectAll<SVGPathElement, LayoutLink>('path')
       .data(layout.links, d => d.id)
 
-    if (animate) {
+    // 自定义路径优先于 linkStyle；因其命令结构未知，跳过 enter/exit 形变插值直接呈现
+    const customLinkPath = options.linkPathGenerator
+    const dOf = (l: LayoutLink): string =>
+      customLinkPath
+        ? customLinkPath(toLinkCtx(l))
+        : linkPath(l, columnGap, linkStyle, orientation)
+    const interpolating = animate && !customLinkPath
+
+    if (interpolating) {
       link
         .exit<LayoutLink>()
         .transition()
         .duration(duration)
-        .attr('d', d => degenerateLinkPath(end, linkStyle, orientation))
+        .attr('d', () => degenerateLinkPath(end, linkStyle, orientation))
         .remove()
     } else {
       link.exit<LayoutLink>().remove()
@@ -582,16 +612,21 @@ export function createBidirectionalTree(
       .enter()
       .append('path')
       .attr('class', 'd3t-link')
-      .attr('d', () => (animate ? degenerateLinkPath(start, linkStyle, orientation) : ''))
+      .attr('fill', 'none')
+      .attr('stroke', linkColorOf)
+      .attr('stroke-width', linkWidthOf)
+      .attr('d', d => (interpolating ? degenerateLinkPath(start, linkStyle, orientation) : dOf(d)))
     const linkMerged = linkEnter.merge(link)
-    if (animate) {
+    if (interpolating) {
       linkMerged
         .transition()
         .duration(duration)
-        .attr('d', d => linkPath(d, columnGap, linkStyle, orientation))
+        .attr('d', dOf)
     } else {
-      linkMerged.attr('d', d => linkPath(d, columnGap, linkStyle, orientation))
+      linkMerged.attr('d', dOf)
     }
+    // 颜色/线宽逐 path 刷新（attr 优先级低于 CSS，用户仍可用 .d3t-link 覆盖）
+    linkMerged.attr('stroke', linkColorOf).attr('stroke-width', linkWidthOf)
 
     // ---- 节点 ----
     // 选择器限定 g.d3t-node：避免把徽标分组 g.d3t-badge（携带同 key 的数据）卷进 join 而被误判为重复 key 移除
@@ -745,9 +780,10 @@ export function createBidirectionalTree(
     options.onGroupsChange?.([...groupColors.entries()].map(([name, color]) => ({ name, color })))
   }
 
+  // 分组回调先于首帧触发，让监听方（图例/连线着色等）在首帧渲染前完成准备
   groupColors = computeGroupColors(currentData)
-  render()
   emitGroups()
+  render()
 
   return {
     setData(data) {
@@ -758,8 +794,8 @@ export function createBidirectionalTree(
       visibleGroups = null
       groupColors = computeGroupColors(data)
       positions.clear()
-      render(sourceKey)
       emitGroups()
+      render(sourceKey)
     },
     toggle(id) {
       toggleById(id)

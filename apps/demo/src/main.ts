@@ -48,7 +48,20 @@ const options = {
   },
 }
 
-let tree: TreeInstance = createBidirectionalTree(container, options)
+let tree: TreeInstance
+
+/** 连线按目标节点分组着色（图例色），未分组回退默认灰；须在 create 之前装配进 options */
+const groupColorMap = new Map<string, string>()
+const originalOnGroupsChange = options.onGroupsChange
+;(options as { linkColor?: unknown }).linkColor = (l: {
+  target: { data: TreeNodeData }
+}): string => groupColorMap.get(l.target.data.group ?? '') ?? '#C0C4CC'
+options.onGroupsChange = (groups: Array<{ name: string; color: string }>) => {
+  groupColorMap.clear()
+  for (const { name, color } of groups) groupColorMap.set(name, color)
+  originalOnGroupsChange?.(groups)
+}
+tree = createBidirectionalTree(container, options)
 
 function setMode(next: PickMode): void {
   mode = next
@@ -142,4 +155,20 @@ orientBtn.addEventListener('click', () => {
   ;(options as { orientation?: 'horizontal' | 'vertical' }).orientation = orientation
   tree = createBidirectionalTree(container, options)
   tree.zoomToFit()
+})
+const linkStyleSeq = ['orthogonal', 'straight', 'diagonal'] as const
+const linkStyleName: Record<(typeof linkStyleSeq)[number], string> = {
+  orthogonal: '折线',
+  straight: '直线',
+  diagonal: '曲线',
+}
+let linkStyleIdx = 0
+const linkBtn = document.querySelector<HTMLButtonElement>('#btn-linkstyle')!
+linkBtn.addEventListener('click', () => {
+  linkStyleIdx = (linkStyleIdx + 1) % linkStyleSeq.length
+  const next = linkStyleSeq[linkStyleIdx]!
+  linkBtn.textContent = `连线：${linkStyleName[next]}`
+  tree.destroy()
+  ;(options as { linkStyle?: string }).linkStyle = next
+  tree = createBidirectionalTree(container, options)
 })

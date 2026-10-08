@@ -22,7 +22,28 @@ export interface TreeNodeData {
 /** 文本度量器：返回节点总宽度（含内边距）。可注入以保证测试确定性 */
 export type TextMeasurer = (text: string, variant: NodeVariant) => number
 
-export type LinkStyle = 'orthogonal' | 'diagonal'
+export type LinkStyle = 'orthogonal' | 'diagonal' | 'straight'
+
+/** 连线端点（源/目标节点）的公开几何与数据信息 */
+export interface LinkEndpoint {
+  data: TreeNodeData
+  variant: NodeVariant
+  side: Side | 'center'
+  depth: number
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** 连线上下文：source 为父节点，target 为子节点 */
+export interface LinkRenderContext {
+  source: LinkEndpoint
+  target: LinkEndpoint
+}
+
+/** 连线颜色：CSS 颜色串，或按连线两端信息返回颜色 */
+export type LinkColor = string | ((link: LinkRenderContext) => string)
 
 /** 布局方向：水平（左右分侧，默认）或垂直（上下分侧） */
 export type Orientation = 'horizontal' | 'vertical'
@@ -65,8 +86,14 @@ export interface TreeOptions {
   columnGap?: number
   /** 每个父节点默认可见子节点数上限，超出聚合为“展开 (N)”；0 表示不聚合。默认 5 */
   visibleChildrenLimit?: number
-  /** 连线样式：直角折线（默认）或贝塞尔对角线 */
+  /** 连线样式：直角折线（默认）、贝塞尔对角线或直线 */
   linkStyle?: LinkStyle
+  /** 连线颜色：CSS 颜色串或按连线两端信息返回（缺省 #C0C4CC） */
+  linkColor?: LinkColor
+  /** 连线宽度（px），缺省 1 */
+  linkWidth?: number
+  /** 完全自定义连线路径：返回 SVG path 的 d，优先于 linkStyle（自定义路径不做形变插值） */
+  linkPathGenerator?: (link: LinkRenderContext) => string
   /** 布局方向：水平左右分侧（默认）或垂直上下分侧；垂直模式下 rowHeight/columnGap 语义对调（兄弟间距/深度行距） */
   orientation?: Orientation
   /** 按 group 字段着色（内置调色板，配白色文字）；默认 false 保持参考稿白节点风格 */
