@@ -15,3 +15,7 @@ Issues 以本地 Markdown 文件形式跟踪于 `.scratch/<feature-slug>/`。详
 ### Domain docs
 
 单上下文布局：根目录 `CONTEXT.md` + `docs/adr/`。详见 `docs/agents/domain.md`。
+
+### Testing
+
+测试期望值独立推导、bug 修复携带可杀死旧 bug 的回归测试、代码与测试冲突按规格缺口裁决。详见 `docs/agents/testing.md`。
