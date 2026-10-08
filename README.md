@@ -23,9 +23,11 @@
 
 ```bash
 pnpm install
-pnpm dev     # 打开 http://localhost:5183（原生 / Vue / React 三个 demo 页）
-pnpm test    # vitest（core 46 例）
-pnpm build   # tsup 构建三包
+pnpm dev         # demo 三页 + 自定义页（Vite，默认 5183 端口）
+pnpm docs:dev    # 文档站（VitePress：安装/活示例/API）
+pnpm docs:build  # 文档站静态产物（apps/docs/.vitepress/dist，可托管任意静态服务）
+pnpm test        # vitest（core 66 例）
+pnpm build       # tsup 构建三包
 ```
 
 ## 原生使用（@d3-tree/core）
