@@ -41,6 +41,8 @@ export interface TreeOptions {
   visibleChildrenLimit?: number
   /** 连线样式：直角折线（默认）或贝塞尔对角线 */
   linkStyle?: LinkStyle
+  /** 按 group 字段着色（内置调色板，配白色文字）；默认 false 保持参考稿白节点风格 */
+  colorByGroup?: boolean
   /** 文本度量器注入（测试用）；缺省离屏 canvas measureText */
   measureText?: TextMeasurer
   /** 节点着色回调（非根节点），返回 CSS 颜色 */
@@ -54,6 +56,8 @@ export interface TreeOptions {
   onNodeSelect?: (node: TreeNodeData) => void
   /** 点击节点本体是否触发折叠切换，默认 true；置 false 后点击仅触发回调（编辑选取模式） */
   toggleOnNodeClick?: boolean
+  /** 分组集合变化时回调（初始渲染与 setData 后触发），供图例 UI 构建使用 */
+  onGroupsChange?: (groups: Array<{ name: string; color: string }>) => void
 }
 
 /** createBidirectionalTree 返回的图表实例（命令式 API） */
@@ -75,6 +79,11 @@ export interface TreeInstance {
   removeChild(id: string): boolean
   /** 缩放平移使当前可见内容完整落入视口（含边距，只缩小不放大） */
   zoomToFit(): void
+  /**
+   * 按分组过滤可见节点：仅保留命中分组（含其整棵子树）与未分组节点。
+   * 传 null 恢复全部。
+   */
+  setVisibleGroups(groups: string[] | null): void
   /** 移除 SVG 与全部监听 */
   destroy(): void
 }

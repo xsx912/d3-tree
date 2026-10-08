@@ -97,27 +97,126 @@ export function createBidirectionalTree(
     .on('zoom', event => {
       gZoom.attr('transform', event.transform.toString())
     })
-  svg.call(zoomBehavior).on('dblclick.zoom', null)
+  svg.call(zoomBehavior).on('dblclick.zoom', null) // 双击留给业务，不抢缩放
+
+  // ---- tooltip（容器内绝对定位 div，框架无关）----
+  if (getComputedStyle(container).position === 'static') {
+    container.style.position = 'relative'
+  }
+  const tooltipEl = document.createElement('div')
+  tooltipEl.className = 'd3t-tooltip'
+  Object.assign(tooltipEl.style, {
+    display: 'none',
+    position: 'absolute',
+    zIndex: '1000',
+    pointerEvents: 'none',
+    background: '#FFFFFF',
+    border: '1px solid ' + theme.nodeStroke,
+    borderRadius: '4px',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)',
+    padding: '8px 12px',
+    fontSize: '12px',
+    color: theme.nodeText,
+    fontFamily: theme.font,
+    lineHeight: '1.7',
+    maxWidth: '280px',
+  } satisfies Partial<CSSStyleDeclaration>)
+  container.appendChild(tooltipEl)
+
+  function escapeHtml(text: string): string {
+    const div = document.createElement('div')
+    div.textContent = text
+    return div.innerHTML
+  }
+
+  function defaultTooltipHtml(node: TreeNodeData): string {
+    const rows = Object.entries(node.properties ?? {})
+      .map(([k, v]) => `<tr><td style="padding-right:12px;color:#909399">${escapeHtml(k)}</td><td>${escapeHtml(String(v))}</td></tr>`)
+      .join('')
+    const title = `<div style="font-weight:600;margin-bottom:4px">${escapeHtml(node.name)}</div>`
+    return rows ? `${title}<table>${rows}</table>` : title
+  }
+
+  function showTooltip(event: MouseEvent, d: LayoutNode): void {
+    if (d.variant === 'aggregate') return
+    tooltipEl.innerHTML = options.tooltip?.formatter
+      ? options.tooltip.formatter(d.data)
+      : defaultTooltipHtml(d.data)
+    tooltipEl.style.display = 'block'
+    moveTooltip(event)
+  }
+
+  function moveTooltip(event: MouseEvent): void {
+    if (tooltipEl.style.display === 'none') return
+    const rect = container.getBoundingClientRect()
+    const w = tooltipEl.offsetWidth
+    const h = tooltipEl.offsetHeight
+    let x = event.clientX - rect.left + 14
+    let y = event.clientY - rect.top + 14
+    if (x + w > rect.width) x = event.clientX - rect.left - w - 10
+    if (y + h > rect.height) y = event.clientY - rect.top - h - 10
+    tooltipEl.style.left = `${Math.max(x, 2)}px`
+    tooltipEl.style.top = `${Math.max(y, 2)}px`
+  }
+
+  function hideTooltip(): void {
+    tooltipEl.style.display = 'none'
+  }
 
   let currentData: TreeNodeData = options.data
   let collapsedIds = seedCollapsed(currentData)
   /** 聚合释放状态：父 id → 已额外释放的子节点数（超出 visibleChildrenLimit 部分） */
   let revealed = new Map<string, number>()
+  /** 分组过滤：null = 全部可见 */
+  let visibleGroups: Set<string> | null = null
+  /** 分组 → 调色板颜色（setData 时重算） */
+  let groupColors = new Map<string, string>()
   /** 上一帧渲染的节点位置（key → 中心点），供 enter 过渡起点与 exit 收拢目标使用 */
   const positions = new Map<string, Position>()
 
+  function computeGroupColors(data: TreeNodeData): Map<string, string> {
+    const colors = new Map<string, string>()
+    if (!options.colorByGroup) return colors
+    const walk = (node: TreeNodeData): void => {
+      if (node.group && !colors.has(node.group)) {
+        colors.set(node.group, theme.groupPalette[colors.size % theme.groupPalette.length]!)
+      }
+      for (const child of node.children ?? []) walk(child)
+    }
+    walk(data)
+    return colors
+  }
+
   function rectFill(d: LayoutNode): string {
     if (d.variant === 'root') return theme.rootFill
-    return options.nodeColor?.(d.data) ?? theme.nodeFill
+    const custom = options.nodeColor?.(d.data)
+    if (custom) return custom
+    if (options.colorByGroup && d.data.group) {
+      return groupColors.get(d.data.group) ?? theme.nodeFill
+    }
+    return theme.nodeFill
+  }
+
+  /** 分组着色或自定义着色时使用白字保证对比度 */
+  function isColored(d: LayoutNode): boolean {
+    if (d.variant === 'root') return false
+    if (options.nodeColor?.(d.data)) return true
+    return options.colorByGroup === true && !!d.data.group && groupColors.has(d.data.group)
   }
 
   function textColor(d: LayoutNode): string {
     if (d.variant === 'root') return theme.rootText
-    return theme.nodeText
+    if (d.variant === 'aggregate') return theme.aggregateText
+    return isColored(d) ? '#FFFFFF' : theme.nodeText
+  }
+
+  function sanitizeGroupClass(group: string): string {
+    return group.replace(/[^a-zA-Z0-9_-]+/g, '-')
   }
 
   function nodeClass(d: LayoutNode): string {
-    return `d3t-node d3t-node--${d.variant} d3t-side--${d.side}`
+    const group = d.data.group && d.variant !== 'root' ? ` d3t-group--${sanitizeGroupClass(d.data.group)}` : ''
+    return `d3t-node d3t-node--${d.variant} d3t-side--${d.side}${group}`
   }
 
   function size(): { width: number; height: number } {
@@ -191,6 +290,7 @@ export function createBidirectionalTree(
       { measureText, rowHeight, columnGap },
       collapsedIds,
       { limit: visibleChildrenLimit, revealed },
+      visibleGroups,
     )
     const { width, height } = size()
     gChart.attr('transform', `translate(${width / 2},${height / 2})`)
@@ -266,6 +366,9 @@ export function createBidirectionalTree(
         options.onNodeSelect?.(d.data)
         if (d.variant !== 'root' && options.toggleOnNodeClick !== false) toggleById(d.data.id)
       })
+      .on('mouseenter', (event, d) => showTooltip(event as MouseEvent, d))
+      .on('mousemove', (event) => moveTooltip(event as MouseEvent))
+      .on('mouseleave', hideTooltip)
 
     nodeEnter
       .append('rect')
@@ -341,11 +444,23 @@ export function createBidirectionalTree(
       )
     })
 
+    // 颜色刷新（nodeColor 回调/分组调色板可能随 setData 变化）
+    nodeMerged.select<SVGRectElement>('rect').attr('fill', rectFill)
+    nodeMerged.select<SVGTextElement>('text.d3t-label').attr('fill', textColor)
+
+    hideTooltip()
+
     positions.clear()
     for (const n of layout.nodes) positions.set(n.key, { x: n.x, y: n.y })
   }
 
+  function emitGroups(): void {
+    options.onGroupsChange?.([...groupColors.entries()].map(([name, color]) => ({ name, color })))
+  }
+
+  groupColors = computeGroupColors(currentData)
   render()
+  emitGroups()
 
   return {
     setData(data) {
@@ -353,8 +468,11 @@ export function createBidirectionalTree(
       currentData = data
       collapsedIds = seedCollapsed(data)
       revealed = new Map()
+      visibleGroups = null
+      groupColors = computeGroupColors(data)
       positions.clear()
       render(sourceKey)
+      emitGroups()
     },
     toggle(id) {
       toggleById(id)
@@ -401,6 +519,7 @@ export function createBidirectionalTree(
         { measureText, rowHeight, columnGap },
         collapsedIds,
         { limit: visibleChildrenLimit, revealed },
+        visibleGroups,
       )
       const { minX, maxX, minY, maxY } = layout.bounds
       const { width, height } = size()
@@ -415,8 +534,13 @@ export function createBidirectionalTree(
         svg.call(zoomBehavior.transform, t)
       }
     },
+    setVisibleGroups(groups) {
+      visibleGroups = groups ? new Set(groups) : null
+      render(currentData.id)
+    },
     destroy() {
       svg.remove()
+      tooltipEl.remove()
     },
   }
 }

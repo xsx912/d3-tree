@@ -18,9 +18,33 @@ const addBtn = document.querySelector<HTMLButtonElement>('#btn-add')!
 const removeBtn = document.querySelector<HTMLButtonElement>('#btn-remove')!
 
 const defaultHint = '点击节点可折叠/展开；滚轮缩放、拖拽平移'
+const legendEl = document.querySelector<HTMLDivElement>('#legend')!
+const activeGroups = new Set<string>()
+
 const options = {
   data: industryData,
+  colorByGroup: true,
   onNodeSelect: (node: TreeNodeData) => onNodePicked(node),
+  onGroupsChange: (groups: Array<{ name: string; color: string }>) => {
+    legendEl.innerHTML = ''
+    for (const { name, color } of groups) {
+      activeGroups.add(name)
+      const chip = document.createElement('span')
+      chip.className = 'chip'
+      chip.innerHTML = `<span class="dot" style="background:${color}"></span>${name}`
+      chip.addEventListener('click', () => {
+        if (activeGroups.has(name)) {
+          activeGroups.delete(name)
+          chip.classList.add('off')
+        } else {
+          activeGroups.add(name)
+          chip.classList.remove('off')
+        }
+        tree.setVisibleGroups(activeGroups.size ? [...activeGroups] : null)
+      })
+      legendEl.appendChild(chip)
+    }
+  },
 }
 
 const tree: TreeInstance = createBidirectionalTree(container, options)

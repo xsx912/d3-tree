@@ -32,6 +32,15 @@
       #toolbar input:focus { border-color: #1E6EFF; }
       #hint { font-size: 13px; color: #909399; }
       #hint.active { color: #E8684A; }
+      #legend { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+      #legend .chip {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 3px 10px; font-size: 12px; color: #303133;
+        border: 1px solid #DCDFE6; border-radius: 12px; cursor: pointer; user-select: none;
+        background: #fff; transition: opacity 0.15s;
+      }
+      #legend .chip .dot { width: 8px; height: 8px; border-radius: 50%; }
+      #legend .chip.off { opacity: 0.35; text-decoration: line-through; }
       #chart { width: 100vw; height: calc(100vh - 96px); }
     </style>
   </head>
@@ -55,6 +64,7 @@
       <button id="btn-collapse">全收起</button>
       <button id="btn-fit">适配视窗</button>
       <span id="hint">点击节点可折叠/展开；滚轮缩放、拖拽平移</span>
+      <div id="legend"></div>
     </div>
     <div id="chart"></div>
     <script type="module" src="/src/main.ts"></script>

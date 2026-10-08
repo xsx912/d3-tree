@@ -72,7 +72,10 @@ function buildDisplay(
   collapsedIds: Set<string>,
   agg: AggregateConfig,
   side: 'left' | 'right',
-): DisplayNode {
+  visibleGroups: Set<string> | null,
+): DisplayNode | null {
+  // 分组过滤：未命中分组的节点连同其整棵子树一并隐藏（未分组节点不受影响）
+  if (visibleGroups && node.group && !visibleGroups.has(node.group)) return null
   const children = node.children ?? []
   if (!collapsedIds.has(node.id) && children.length) {
     let visible = children
@@ -86,12 +89,12 @@ function buildDisplay(
         aggregate = { original: { id: `__agg__${node.id}`, name } }
       }
     }
+    const childNodes = visible
+      .map(c => buildDisplay(c, collapsedIds, agg, side, visibleGroups))
+      .filter((n): n is DisplayNode => n !== null)
     return {
       original: node,
-      children: [
-        ...visible.map(c => buildDisplay(c, collapsedIds, agg, side)),
-        ...(aggregate ? [{ ...aggregate, aggregate: true as const }] : []),
-      ],
+      children: [...childNodes, ...(aggregate ? [{ ...aggregate, aggregate: true as const }] : [])],
     }
   }
   return { original: node }
@@ -115,6 +118,7 @@ export function computeLayout(
   config: LayoutConfig,
   collapsedIds: Set<string> = new Set(),
   agg: AggregateConfig = { limit: 0, revealed: new Map() },
+  visibleGroups: Set<string> | null = null,
 ): LayoutResult {
   const { measureText, rowHeight, columnGap } = config
   const nodes: LayoutNode[] = []
@@ -146,7 +150,9 @@ export function computeLayout(
     // 合成侧根：不可渲染，仅用于让 d3.tree 以根为 (0,0) 展开一侧子树
     const synthetic: DisplayNode = {
       original: rootData,
-      children: sideChildren.map(c => buildDisplay(c, collapsedIds, agg, side)),
+      children: sideChildren
+        .map(c => buildDisplay(c, collapsedIds, agg, side, visibleGroups))
+        .filter((n): n is DisplayNode => n !== null),
     }
     const h = hierarchy<DisplayNode>(synthetic, d => d.children)
     const laidOut = tree<DisplayNode>()

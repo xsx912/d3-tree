@@ -4,10 +4,10 @@
 
 **Blocked by:** 02（折叠展开）
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] 相同 group 的节点着色一致，不同 group 颜色可区分；nodeColor 回调优先
-- [ ] 悬停显示 tooltip、内容含节点名称与 properties 键值；移出即隐藏；formatter 自定义生效
-- [ ] `setVisibleGroups(['A'])` 后仅 A 组（及其子树）可见，恢复全部也支持
-- [ ] 图例芯片与 setVisibleGroups 联动，芯片含分组名与色点
-- [ ] jsdom 测试：分组类名正确、tooltip 显示/隐藏、筛选后可见集合断言
+- [x] 相同 group 的节点着色一致，不同 group 颜色可区分；nodeColor 回调优先
+- [x] 悬停显示 tooltip、内容含节点名称与 properties 键值；移出即隐藏；formatter 自定义生效
+- [x] `setVisibleGroups(['A'])` 后仅 A 组（及其子树）可见，恢复全部也支持
+- [x] 图例芯片与 setVisibleGroups 联动，芯片含分组名与色点
+- [x] jsdom 测试：分组类名正确、tooltip 显示/隐藏、筛选后可见集合断言
