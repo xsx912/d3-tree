@@ -30,7 +30,7 @@ export default defineConfig({
         items: [{ text: '产业链图谱', link: '/demos/basic' }],
       },
     ],
-    socialLinks: [{ icon: 'github', link: 'https://github.com/example/d3-tree' }],
+    socialLinks: [{ icon: 'github', link: 'https://github.com/xsx912/d3-tree' }],
     search: {
       provider: 'local',
       options: { translations: { button: { buttonText: '搜索文档', buttonAriaLabel: '搜索' } } },
