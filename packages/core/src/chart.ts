@@ -1,15 +1,15 @@
-import { select, zoom, ZoomTransform, zoomTransform } from 'd3'
+import { select } from 'd3-selection'
+import { zoom, ZoomTransform, zoomTransform } from 'd3-zoom'
+import 'd3-transition' // 副作用：为 selection 注册 .transition()
 import { computeLayout, degenerateLinkPath, linkPath } from './layout'
 import type { LayoutLink, LayoutNode, LayoutResult } from './layout'
 import { createCanvasMeasurer } from './measure'
 import { theme } from './theme'
 import type {
   ExportImageOptions,
-  LinkColor,
   LinkEndpoint,
   LinkRenderContext,
   LinkStyle,
-  NodeRenderContext,
   NodeRenderer,
   NodeSizeFn,
   NodeTemplate,
@@ -565,7 +565,7 @@ export function createBidirectionalTree(
   function currentLayout(): LayoutResult {
     return computeLayout(
       currentData,
-      { measureText, rowHeight, columnGap, nodeSize: sizeOf, orientation },
+      { rowHeight, columnGap, nodeSize: sizeOf, orientation },
       collapsedIds,
       { limit: visibleChildrenLimit, revealed },
       visibleGroups,
@@ -652,7 +652,7 @@ export function createBidirectionalTree(
       .attr('data-id', d => d.data.id)
       .attr('transform', () => `translate(${start.x},${start.y})`)
       .attr('cursor', d => (d.variant === 'root' ? 'default' : 'pointer'))
-      .on('click', (event, d) => {
+      .on('click', (_event, d) => {
         if (d.variant === 'aggregate') {
           revealByParent(d.parentId)
           return

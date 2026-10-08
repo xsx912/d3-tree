@@ -88,11 +88,6 @@ function onNodePicked(node: TreeNodeData): void {
   }
 }
 
-function exitIfIdle(): boolean {
-  if (mode === 'none') return true
-  return false
-}
-
 addBtn.addEventListener('click', () => setMode('add'))
 removeBtn.addEventListener('click', () => {
   if (mode === 'remove' && picked) {
@@ -105,7 +100,6 @@ removeBtn.addEventListener('click', () => {
 })
 cancelBtn.addEventListener('click', () => setMode('none'))
 confirmBtn.addEventListener('click', () => {
-  if (exitIfIdle()) return
   const name = nameInput.value.trim()
   if (!picked || !name) {
     hint.textContent = '请先选取父节点并输入名称'

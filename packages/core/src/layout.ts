@@ -1,12 +1,10 @@
-import { hierarchy, tree } from 'd3'
-import { theme } from './theme'
+import { hierarchy, tree } from 'd3-hierarchy'
 import type {
   LinkStyle,
   NodeSizeFn,
   NodeVariant,
   Orientation,
   Side,
-  TextMeasurer,
   TreeNodeData,
 } from './types'
 
@@ -70,7 +68,6 @@ export interface LayoutResult {
 }
 
 export interface LayoutConfig {
-  measureText: TextMeasurer
   rowHeight: number
   columnGap: number
   /** 节点几何来源（chart 层默认：文字度量宽 + 内置高度） */
@@ -135,7 +132,7 @@ function siblingAxisSpan(
 }
 
 /** 根的直接子节点分侧：显式 side 优先，缺省前一半 left、后一半 right */
-export function splitSides(root: TreeNodeData): { left: TreeNodeData[]; right: TreeNodeData[] } {
+function splitSides(root: TreeNodeData): { left: TreeNodeData[]; right: TreeNodeData[] } {
   const left: TreeNodeData[] = []
   const right: TreeNodeData[] = []
   const list = root.children ?? []

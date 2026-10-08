@@ -42,7 +42,7 @@ function click(el: Element): void {
 describe('节点完全自定义（工单10）', () => {
   it('nodeSize 生效：节点几何与列间距按自定义宽高计算', () => {
     const { container } = mount(fixture(), {
-      nodeSize: (data: TreeNodeData, variant: 'root' | 'node' | 'aggregate') =>
+      nodeSize: (_data: TreeNodeData, variant: 'root' | 'node' | 'aggregate') =>
         variant === 'root' ? { width: 200, height: 60 } : { width: 120, height: 40 },
     })
     const rootRect = container.querySelector('g[data-id="root"] rect')!

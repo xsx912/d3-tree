@@ -82,7 +82,7 @@ describe('“展开 (N)”聚合懒加载（工单03）', () => {
         { id: 'c', name: '丙板块', side: 'right', children: [child('c1'), child('c2')] },
       ],
     }
-    const loadChildren = vi.fn((parent: TreeNodeData) =>
+    const loadChildren = vi.fn((_parent: TreeNodeData) =>
       Promise.resolve([child('c3'), child('c4'), child('c5')]),
     )
     const { container } = mount(data, { visibleChildrenLimit: 1, loadChildren })
