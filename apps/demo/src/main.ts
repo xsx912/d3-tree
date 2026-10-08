@@ -105,6 +105,23 @@ confirmBtn.addEventListener('click', () => {
 nameInput.addEventListener('keydown', e => {
   if (e.key === 'Enter') confirmBtn.click()
 })
+const searchBox = document.querySelector<HTMLInputElement>('#search-box')!
+searchBox.addEventListener('input', () => {
+  const kw = searchBox.value.trim()
+  if (!kw) {
+    tree.clearSearch()
+    hint.textContent = defaultHint
+    return
+  }
+  const hits = tree.search(kw)
+  hint.textContent = hits > 0 ? `「${kw}」命中 ${hits} 个节点` : `「${kw}」无命中`
+})
+document.querySelector<HTMLButtonElement>('#btn-export-svg')!.addEventListener('click', () => {
+  tree.exportImage({ format: 'svg', filename: '产业链图谱' })
+})
+document.querySelector<HTMLButtonElement>('#btn-export-png')!.addEventListener('click', () => {
+  tree.exportImage({ format: 'png', scale: 2, filename: '产业链图谱' })
+})
 document.querySelector<HTMLButtonElement>('#btn-expand')!.addEventListener('click', () => {
   tree.expandAll()
   tree.zoomToFit()

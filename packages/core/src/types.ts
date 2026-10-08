@@ -60,6 +60,15 @@ export interface TreeOptions {
   onGroupsChange?: (groups: Array<{ name: string; color: string }>) => void
 }
 
+/** 导出选项 */
+export interface ExportImageOptions {
+  format?: 'svg' | 'png'
+  /** PNG 放大倍数，默认 2 */
+  scale?: number
+  /** 文件名（不含扩展名），默认 "bidirectional-tree" */
+  filename?: string
+}
+
 /** createBidirectionalTree 返回的图表实例（命令式 API） */
 export interface TreeInstance {
   /** 整体替换数据并过渡到新布局 */
@@ -84,6 +93,16 @@ export interface TreeInstance {
    * 传 null 恢复全部。
    */
   setVisibleGroups(groups: string[] | null): void
+  /**
+   * 搜索关键词（匹配节点名称与 properties 字符串值，不区分大小写）：
+   * 命中节点及其全部祖先链高亮、其余节点淡化，视口定位到首个命中
+   * （命中路径上的折叠与聚合会自动展开）。返回命中数量；无命中不改现有高亮。
+   */
+  search(keyword: string): number
+  /** 清除搜索高亮并还原淡化 */
+  clearSearch(): void
+  /** 导出当前可见图谱为 SVG 或 PNG 文件 */
+  exportImage(options?: ExportImageOptions): Promise<void>
   /** 移除 SVG 与全部监听 */
   destroy(): void
 }

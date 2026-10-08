@@ -1,6 +1,6 @@
-import { select, zoom, ZoomTransform } from 'd3'
+import { select, zoom, ZoomTransform, zoomTransform } from 'd3'
 import { computeLayout, degenerateLinkPath, linkPath } from './layout'
-import type { LayoutLink, LayoutNode } from './layout'
+import type { LayoutLink, LayoutNode, LayoutResult } from './layout'
 import { createCanvasMeasurer } from './measure'
 import { theme } from './theme'
 import type {
@@ -15,6 +15,16 @@ interface Position {
   x: number
   y: number
 }
+
+/** 注入容器的高亮/淡化样式（导出时会内联进克隆 SVG） */
+const SVG_CSS = `
+.d3t-svg .d3t-dimmed { opacity: 0.2; }
+.d3t-svg .d3t-hit rect { stroke: #1E6EFF; stroke-width: 2; }
+.d3t-svg .d3t-hit text.d3t-label { fill: #1E6EFF; font-weight: 600; }
+.d3t-svg .d3t-hit-ancestor rect { stroke-dasharray: 4 2; }
+.d3t-svg .d3t-loading rect { stroke-dasharray: 3 2; animation: d3t-blink 1s infinite; }
+@keyframes d3t-blink { 50% { opacity: 0.55; } }
+`
 
 /** 深度优先查找指定 id 的数据节点 */
 function findDataById(root: TreeNodeData, id: string): TreeNodeData | undefined {
@@ -161,6 +171,207 @@ export function createBidirectionalTree(
 
   function hideTooltip(): void {
     tooltipEl.style.display = 'none'
+  }
+
+  // ---- 高亮/淡化样式注入 ----
+  const styleEl = document.createElement('style')
+  styleEl.textContent = SVG_CSS
+  container.appendChild(styleEl)
+
+  /** 最近一次渲染的布局（搜索定位/导出取包围盒用；render() 首帧赋值） */
+  let lastLayout: LayoutResult | null = null
+
+  // ---- 搜索 ----
+  interface SearchState {
+    hits: Set<string>
+    ancestors: Set<string>
+  }
+  let searchState: SearchState | null = null
+
+  function collectHits(
+    keyword: string,
+  ): { hits: Set<string>; paths: TreeNodeData[][] } {
+    const kw = keyword.toLowerCase()
+    const hits = new Set<string>()
+    const paths: TreeNodeData[][] = []
+    const walk = (node: TreeNodeData, path: TreeNodeData[]): void => {
+      const hit =
+        node.name.toLowerCase().includes(kw) ||
+        Object.values(node.properties ?? {}).some(v => String(v).toLowerCase().includes(kw))
+      if (hit) {
+        hits.add(node.id)
+        paths.push([...path, node])
+      }
+      for (const child of node.children ?? []) walk(child, [...path, node])
+    }
+    walk(currentData, [])
+    return { hits, paths }
+  }
+
+  function applySearchClasses(state: SearchState): void {
+    const inChain = (id: string) => state.hits.has(id) || state.ancestors.has(id)
+    gNode
+      .selectAll<SVGGElement, LayoutNode>('g.d3t-node')
+      .classed('d3t-hit', d => state.hits.has(d.data.id))
+      .classed(
+        'd3t-hit-ancestor',
+        d => state.ancestors.has(d.data.id) && !state.hits.has(d.data.id),
+      )
+      .classed(
+        'd3t-dimmed',
+        d => d.variant !== 'root' && !inChain(d.data.id),
+      )
+    gLink
+      .selectAll<SVGPathElement, LayoutLink>('path.d3t-link')
+      .classed('d3t-dimmed', d => !inChain(d.source.data.id) || !inChain(d.target.data.id))
+  }
+
+  function focusNode(nodeId: string): void {
+    const target = lastLayout?.nodes.find(n => n.data.id === nodeId)
+    if (!target) return
+    const { width, height } = size()
+    const current = zoomTransform(svg.node()!)
+    const k = Math.max(current.k, 0.9)
+    const cx = width / 2 - k * (width / 2 + target.x)
+    const cy = height / 2 - k * (height / 2 + target.y)
+    const t = new ZoomTransform(k, cx, cy)
+    if (duration > 0) {
+      svg.transition().duration(duration).call(zoomBehavior.transform, t)
+    } else {
+      svg.call(zoomBehavior.transform, t)
+    }
+  }
+
+  function searchImpl(keyword: string): number {
+    const kw = keyword.trim()
+    if (!kw) {
+      clearSearchImpl()
+      return 0
+    }
+    const { hits, paths } = collectHits(kw)
+    if (!hits.size) return 0 // 无命中：保持现有高亮不变
+    clearSearchImpl()
+
+    // 命中路径上的折叠与聚合自动展开，保证命中节点可见
+    const ancestors = new Set<string>()
+    for (const path of paths) {
+      for (let i = 0; i < path.length - 1; i++) {
+        const parent = path[i]!
+        const child = path[i + 1]!
+        ancestors.add(parent.id)
+        collapsedIds.delete(parent.id)
+        if (visibleChildrenLimit > 0 && parent.children?.length) {
+          const idx = parent.children.findIndex(c => c.id === child.id)
+          if (idx >= visibleChildrenLimit) {
+            const need = idx + 1 - visibleChildrenLimit
+            revealed.set(parent.id, Math.max(revealed.get(parent.id) ?? 0, need))
+          }
+        }
+      }
+    }
+
+    searchState = { hits, ancestors }
+    render(currentData.id)
+    applySearchClasses(searchState)
+    const firstPath = paths[0]!
+    const firstId = firstPath[firstPath.length - 1]!.id
+    focusNode(firstId)
+    return hits.size
+  }
+
+  function clearSearchImpl(): void {
+    if (!searchState) return
+    searchState = null
+    gNode
+      .selectAll<SVGGElement, LayoutNode>('g.d3t-node')
+      .classed('d3t-hit', false)
+      .classed('d3t-hit-ancestor', false)
+      .classed('d3t-dimmed', false)
+    gLink.selectAll<SVGPathElement, LayoutLink>('path.d3t-link').classed('d3t-dimmed', false)
+  }
+
+  // ---- 导出 ----
+  function buildExportSvg(): { element: SVGSVGElement; width: number; height: number } {
+    const bounds = lastLayout?.bounds
+    if (!bounds) throw new Error('尚未完成首次渲染，无法导出')
+    const { minX, maxX, minY, maxY } = bounds
+    const pad = 24
+    const w = maxX - minX + pad * 2
+    const h = maxY - minY + pad * 2
+    const { width: cw, height: ch } = size()
+    const originX = cw / 2 + minX - pad
+    const originY = ch / 2 + minY - pad
+
+    const clone = svg.node()!.cloneNode(true) as SVGSVGElement
+    const c = select(clone)
+    c.attr('width', w)
+      .attr('height', h)
+      .attr('viewBox', `${originX} ${originY} ${w} ${h}`)
+      .attr('cursor', null)
+      .style('background', '#FFFFFF')
+    c.select('g.d3t-zoom').attr('transform', null) // 忽略当前缩放，导出完整内容
+    clone.querySelectorAll('[cursor]').forEach(el => el.removeAttribute('cursor'))
+    const style = document.createElementNS('http://www.w3.org/2000/svg', 'style')
+    style.textContent = SVG_CSS
+    clone.insertBefore(style, clone.firstChild)
+    return { element: clone, width: w, height: h }
+  }
+
+  function triggerDownload(href: string, filename: string): void {
+    const a = document.createElement('a')
+    a.href = href
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  }
+
+  async function svgToPngDataUrl(
+    svgString: string,
+    width: number,
+    height: number,
+    scale: number,
+  ): Promise<string> {
+    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    try {
+      const img = new Image()
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve()
+        img.onerror = () => reject(new Error('SVG 图像加载失败'))
+        img.src = url
+      })
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.ceil(width * scale)
+      canvas.height = Math.ceil(height * scale)
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('Canvas 2D 上下文不可用')
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      return canvas.toDataURL('image/png')
+    } finally {
+      URL.revokeObjectURL(url)
+    }
+  }
+
+  async function exportImageImpl(opts: {
+    format?: 'svg' | 'png'
+    scale?: number
+    filename?: string
+  }): Promise<void> {
+    const format = opts.format ?? 'png'
+    const scale = opts.scale ?? 2
+    const filename = opts.filename ?? 'bidirectional-tree'
+    const { element, width, height } = buildExportSvg()
+    const svgString = new XMLSerializer().serializeToString(element)
+    if (format === 'svg') {
+      const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' })
+      triggerDownload(URL.createObjectURL(blob), `${filename}.svg`)
+      return
+    }
+    const dataUrl = await svgToPngDataUrl(svgString, width, height, scale)
+    triggerDownload(dataUrl, `${filename}.png`)
   }
 
   let currentData: TreeNodeData = options.data
@@ -450,6 +661,7 @@ export function createBidirectionalTree(
 
     hideTooltip()
 
+    lastLayout = layout
     positions.clear()
     for (const n of layout.nodes) positions.set(n.key, { x: n.x, y: n.y })
   }
@@ -538,9 +750,19 @@ export function createBidirectionalTree(
       visibleGroups = groups ? new Set(groups) : null
       render(currentData.id)
     },
+    search(keyword) {
+      return searchImpl(keyword)
+    },
+    clearSearch() {
+      clearSearchImpl()
+    },
+    exportImage(options) {
+      return exportImageImpl(options ?? {})
+    },
     destroy() {
       svg.remove()
       tooltipEl.remove()
+      styleEl.remove()
     },
   }
 }
