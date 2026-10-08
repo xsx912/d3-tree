@@ -1,0 +1,154 @@
+# d3-tree · 双向树图谱
+
+基于 [d3 v7](https://d3js.org/) 的**横向双向树图谱**库：根节点居中，子树向左右两侧展开，适合呈现企业产业链、组织架构、思维导图等"中心实体 + 双侧分类下钻"的层级数据。
+
+像 d3 本身一样**框架无关**——核心零框架依赖，另附 Vue 3 / React 薄封装：
+
+| 包 | 说明 |
+| --- | --- |
+| `@d3-tree/core` | 框架无关核心（本仓库全部能力的实现处） |
+| `@d3-tree/vue` | Vue 3 组件 `<BidirectionalTree>` |
+| `@d3-tree/react` | React 18/19 组件 `<BidirectionalTree>` |
+
+**特性**
+
+- 双向布局：变宽圆角矩形节点、按列对齐、直角折线连线（可选贝塞尔）、左半区徽标在左/右半区在右
+- 折叠展开：对齐官方 [collapsible-tree](https://observablehq.com/@d3/collapsible-tree)（250ms 过渡，子树自点击处长出/回拢），节点本体与 +/− 徽标均可点击
+- 懒加载聚合：子节点超限聚合为"展开 (N)"分批释放，`loadChildren` 异步回调缝可接远程 API
+- 缩放平移 + `zoomToFit`；分组着色 + tooltip + 图例筛选；搜索高亮定位（含祖先链）；导出 PNG/SVG；编程式增删节点
+- TypeScript 全量类型，Vitest 覆盖公共 API（单缝测试）
+
+## 快速开始
+
+```bash
+pnpm install
+pnpm dev     # 打开 http://localhost:5183（原生 / Vue / React 三个 demo 页）
+pnpm test    # vitest（core 46 例）
+pnpm build   # tsup 构建三包
+```
+
+## 原生使用（@d3-tree/core）
+
+```ts
+import { createBidirectionalTree } from '@d3-tree/core'
+
+const chart = createBidirectionalTree(document.querySelector('#chart')!, {
+  data: {
+    id: 'root',
+    name: '小米科技有限责任公司',
+    children: [
+      { id: 'hw', name: '智能硬件', side: 'right', children: [/* … */] },
+      { id: 'fin', name: '金融科技', side: 'left' },
+    ],
+  },
+  colorByGroup: true,          // 按 group 字段着色
+  visibleChildrenLimit: 5,     // 超出聚合为“展开 (N)”
+  onNodeClick: node => console.log(node),
+})
+
+chart.search('手机')           // 命中高亮 + 定位
+chart.addChild('hw', { id: 'tv', name: '智能电视' }, 'right')
+chart.exportImage({ format: 'png', scale: 2, filename: '图谱' })
+chart.destroy()
+```
+
+## Vue 3（@d3-tree/vue）
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import { BidirectionalTree } from '@d3-tree/vue'
+import type { BidirectionalTreeExposed } from '@d3-tree/vue'
+
+const tree = ref<BidirectionalTreeExposed | null>(null)
+</script>
+
+<template>
+  <BidirectionalTree
+    ref="tree"
+    :data="data"
+    color-by-group
+    @node-click="onNodeClick"
+    @groups-change="groups => (legend = groups)"
+  />
+</template>
+```
+
+模板 ref 暴露全部命令方法（`search` / `addChild` / `exportImage` / `zoomToFit` / `setVisibleGroups` / `setToggleOnNodeClick` 等）。
+
+## React（@d3-tree/react）
+
+```tsx
+import { useRef } from 'react'
+import { BidirectionalTree } from '@d3-tree/react'
+import type { BidirectionalTreeHandle } from '@d3-tree/react'
+
+export function Chart({ data }) {
+  const tree = useRef<BidirectionalTreeHandle>(null)
+  return (
+    <BidirectionalTree
+      ref={tree}
+      data={data}
+      colorByGroup
+      onNodeClick={node => console.log(node)}
+    />
+  )
+}
+```
+
+`data` 变化走 `setData`（保留实例）；其余配置 props 变化自动重建实例；回调始终读最新闭包。
+
+## 数据模型
+
+```ts
+interface TreeNodeData {
+  id: string                          // 全局唯一，作 join key
+  name: string                        // 节点文字（宽度自适应度量）
+  group?: string                      // 分组：着色 / 图例筛选 / 搜索
+  side?: 'left' | 'right'             // 仅根的直接子节点生效；缺省按数量均分
+  collapsed?: boolean                 // 初始折叠态
+  properties?: Record<string, string | number | boolean | null>  // tooltip 详情
+  children?: TreeNodeData[]
+}
+```
+
+## 配置项（options）
+
+| 选项 | 类型 / 默认 | 说明 |
+| --- | --- | --- |
+| `data` | `TreeNodeData`（必填） | 层级数据 |
+| `duration` | `number` / `250` | 过渡动画时长（ms），`0` 关闭动画 |
+| `rowHeight` | `number` / `48` | 同层兄弟纵向步距 |
+| `columnGap` | `number` / `48` | 深度列水平间距 |
+| `visibleChildrenLimit` | `number` / `5` | 每父节点可见子节点上限，超出聚合"展开 (N)"；`0` 不聚合 |
+| `linkStyle` | `'orthogonal' \| 'diagonal'` / `'orthogonal'` | 连线：直角折线 / 贝塞尔 |
+| `colorByGroup` | `boolean` / `false` | 按 group 调色板着色（白字） |
+| `nodeColor` | `(node) => string` | 自定义节点填充，优先于分组色 |
+| `tooltip.formatter` | `(node) => string` | tooltip HTML 内容（默认名称 + properties 键值表，自动转义） |
+| `loadChildren` | `(parent) => Promise<TreeNodeData[]>` | 点击"展开 (N)"时异步拉取子节点并入数据 |
+| `toggleOnNodeClick` | `boolean` / `true` | `false` 时点击节点仅触发回调（编辑选取模式） |
+| `measureText` | `(text, variant) => number` | 文本度量注入（测试确定性） |
+| `onNodeClick` / `onNodeToggle` / `onNodeSelect` / `onGroupsChange` | 回调 | 节点交互与图例数据事件 |
+
+## 实例方法
+
+| 方法 | 说明 |
+| --- | --- |
+| `setData(data)` | 整体替换数据并过渡 |
+| `toggle(id)` | 切换折叠态（根不可折叠） |
+| `expandAll()` / `collapseAll()` | 全展开（含释放聚合）/ 收起至一级板块 |
+| `addChild(parentId, node, side?)` | 追加子节点；父为根时可指定分侧；折叠父自动展开 |
+| `removeChild(id)` | 删除节点及子树（根不可删） |
+| `search(kw)` / `clearSearch()` | 命中 + 祖先链高亮、其余淡化、定位首个命中（折叠/聚合自动展开）；返回命中数 |
+| `setVisibleGroups(groups \| null)` | 分组过滤（连同子树） |
+| `zoomToFit()` | 适配视口（只缩小不放大） |
+| `exportImage({ format, scale, filename })` | 导出 SVG / PNG（默认 png、2x） |
+| `destroy()` | 移除 SVG、tooltip、样式与监听 |
+
+## 视觉定制
+
+默认视觉对齐企业图谱参考稿：根节点 `#1E6EFF` 蓝底白字加大、普通节点白底 `#DCDFE6` 描边、连线 `#C0C4CC` 直角折线、`+/−` 徽标与"展开 (N)"聚合节点。渲染元素均携带稳定类名（`d3t-node--root|node|aggregate`、`d3t-side--left|right`、`d3t-group--<group>`、`d3t-hit`、`d3t-dimmed` 等），可直接用 CSS 覆盖样式。
+
+## 工程结构与工单
+
+pnpm monorepo（`packages/core|vue|react` + `apps/demo`）。需求规格与实施工单见 [`.scratch/bidirectional-tree/`](.scratch/bidirectional-tree/)（spec + 9 张 tracer-bullet 工单，`issues/` 目录含验收清单）。

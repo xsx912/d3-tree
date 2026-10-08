@@ -4,9 +4,9 @@
 
 **Blocked by:** 07（Vue 封装）, 08（React 封装）
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] README 三种用法示例代码准确（与实际导出一致）
-- [ ] options 与命令方法文档齐全、含默认值
-- [ ] `pnpm build`、`pnpm test`、类型检查全绿
-- [ ] 三页浏览器截图视觉验证通过（风格对齐参考稿、动画行为对齐官方示例）
+- [x] README 三种用法示例代码准确（与实际导出一致）
+- [x] options 与命令方法文档齐全、含默认值
+- [x] `pnpm build`、`pnpm test`、类型检查全绿
+- [x] 三页浏览器截图视觉验证通过（风格对齐参考稿、动画行为对齐官方示例）

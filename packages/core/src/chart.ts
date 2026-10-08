@@ -666,6 +666,15 @@ export function createBidirectionalTree(
     for (const n of layout.nodes) positions.set(n.key, { x: n.x, y: n.y })
   }
 
+  // 容器尺寸就绪或变化时重新居中（修复挂载早于布局时的偏移，如 Vue onMounted 场景）
+  if (typeof ResizeObserver !== 'undefined') {
+    const resizeObserver = new ResizeObserver(() => {
+      const { width, height } = size()
+      gChart.attr('transform', `translate(${width / 2},${height / 2})`)
+    })
+    resizeObserver.observe(container)
+  }
+
   function emitGroups(): void {
     options.onGroupsChange?.([...groupColors.entries()].map(([name, color]) => ({ name, color })))
   }

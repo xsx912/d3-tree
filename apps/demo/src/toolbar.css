@@ -1,5 +1,8 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #fff; }
+body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #fff;
+  display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+}
 header {
   display: flex; align-items: center; gap: 16px;
   padding: 10px 20px; border-bottom: 1px solid #EBEEF5;
@@ -35,5 +38,6 @@ nav a:hover { text-decoration: underline; }
 }
 #legend .chip .dot { width: 8px; height: 8px; border-radius: 50%; }
 #legend .chip.off { opacity: 0.35; text-decoration: line-through; }
-#chart { width: 100vw; height: calc(100vh - 96px); }
+#chart { flex: 1 1 auto; min-height: 0; }
+#root { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .divider { width: 1px; height: 18px; background: #DCDFE6; }
