@@ -121,6 +121,7 @@ interface TreeNodeData {
 | --- | --- | --- |
 | `data` | `TreeNodeData`（必填） | 层级数据 |
 | `duration` | `number` / `250` | 过渡动画时长（ms），`0` 关闭动画 |
+| `fadeOpacity` | `number` / `1` | 展开/收起的淡入淡出透明度（0~1，超出钳制）：展开时新节点与连线从该值淡入至 1，收起时淡出至该值后移除；`1` 即纯位移动画 |
 | `rowHeight` | `number` / `48` | 同层兄弟纵向步距 |
 | `columnGap` | `number` / `48` | 深度列水平间距 |
 | `visibleChildrenLimit` | `number` / `5` | 每父节点可见子节点上限，超出聚合"展开 (N)"；`0` 不聚合 |

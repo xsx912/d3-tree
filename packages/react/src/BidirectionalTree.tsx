@@ -19,6 +19,7 @@ import type {
 export interface BidirectionalTreeProps {
   data: TreeNodeData
   duration?: number
+  fadeOpacity?: number
   rowHeight?: number
   columnGap?: number
   visibleChildrenLimit?: number
@@ -79,6 +80,7 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
     // 配置类 props（不含 data 与回调）变化时重建实例
     const {
       duration,
+      fadeOpacity,
       rowHeight,
       columnGap,
       visibleChildrenLimit,
@@ -101,6 +103,7 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       const options: TreeOptions = {
         data: propsRef.current.data,
         duration,
+        fadeOpacity,
         rowHeight,
         columnGap,
         visibleChildrenLimit,
@@ -132,6 +135,7 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
       duration,
+      fadeOpacity,
       rowHeight,
       columnGap,
       visibleChildrenLimit,
@@ -139,7 +143,6 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       linkColor,
       linkWidth,
       linkPathGenerator,
-      orientation,
       orientation,
       colorByGroup,
       nodeSize,

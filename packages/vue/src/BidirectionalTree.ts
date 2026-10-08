@@ -46,6 +46,7 @@ export const BidirectionalTree = defineComponent({
   props: {
     data: { type: Object as PropType<TreeNodeData>, required: true },
     duration: { type: Number, default: undefined },
+    fadeOpacity: { type: Number, default: undefined },
     rowHeight: { type: Number, default: undefined },
     columnGap: { type: Number, default: undefined },
     visibleChildrenLimit: { type: Number, default: undefined },
@@ -91,6 +92,7 @@ export const BidirectionalTree = defineComponent({
       currentOptions = {
         data: props.data,
         duration: props.duration,
+        fadeOpacity: props.fadeOpacity,
         rowHeight: props.rowHeight,
         columnGap: props.columnGap,
         visibleChildrenLimit: props.visibleChildrenLimit,
@@ -146,6 +148,7 @@ export const BidirectionalTree = defineComponent({
     watch(
       () => [
         props.duration,
+        props.fadeOpacity,
         props.rowHeight,
         props.columnGap,
         props.visibleChildrenLimit,

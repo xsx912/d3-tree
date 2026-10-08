@@ -9,6 +9,7 @@ const searchKw = ref('')
 const hint = ref('点击节点可折叠/展开；滚轮缩放、拖拽平移')
 const orientation = ref<'horizontal' | 'vertical'>('horizontal')
 const linkStyle = ref<'orthogonal' | 'straight' | 'diagonal'>('orthogonal')
+const fadeOpacity = ref(1)
 const groups = ref<Array<{ name: string; color: string }>>([])
 const activeGroups = ref(new Set<string>())
 
@@ -68,6 +69,9 @@ function onGroupsForLinks(gs: Array<{ name: string; color: string }>): void {
       >
         连线：{{ linkStyle === 'orthogonal' ? '折线' : linkStyle === 'straight' ? '直线' : '曲线' }}
       </button>
+      <button @click="fadeOpacity = fadeOpacity === 1 ? 0.6 : fadeOpacity === 0.6 ? 0.25 : 1">
+        淡入淡出：{{ fadeOpacity === 1 ? '关' : fadeOpacity }}
+      </button>
       <span class="hint">{{ hint }}</span>
       <div class="legend">
         <span
@@ -88,6 +92,7 @@ function onGroupsForLinks(gs: Array<{ name: string; color: string }>): void {
         color-by-group
         :orientation="orientation"
         :link-style="linkStyle"
+        :fade-opacity="fadeOpacity"
         :link-color="linkColor"
         @groups-change="onGroupsForLinks"
       />

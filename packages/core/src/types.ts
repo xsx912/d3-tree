@@ -80,6 +80,11 @@ export interface TreeOptions {
   data: TreeNodeData
   /** 过渡动画时长（ms），默认 250（对齐官方 collapsible-tree） */
   duration?: number
+  /**
+   * 展开/收起的淡入淡出透明度（0~1，超出钳制）：展开时新节点与连线从该透明度淡入至 1，
+   * 收起时淡出至该透明度后移除。默认 1 即纯位移动画（不引入 opacity 属性）。
+   */
+  fadeOpacity?: number
   /** 同层兄弟纵向步距，默认 48 */
   rowHeight?: number
   /** 深度列之间的水平间距，默认 48 */

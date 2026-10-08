@@ -101,11 +101,20 @@ function seedCollapsed(root: TreeNodeData): Set<string> {
  * tree.destroy()
  * ```
  */
+/** 补齐缺省 opacity：d3 过渡首帧才读起始值，缺失按 0 插值会造成"收起时反而变亮"的闪烁 */
+function normalizeOpacity(this: SVGElement): string {
+  return this.getAttribute('opacity') ?? '1'
+}
+
 export function createBidirectionalTree(
   container: HTMLElement,
   options: TreeOptions,
 ): TreeInstance {
   const duration = options.duration ?? 250
+  /** 展开淡入/收起淡出的目标透明度：缺省 1 即纯位移（不引入 opacity）；非法值回退 1 */
+  const fadeOption = options.fadeOpacity
+  const fade =
+    fadeOption == null || !Number.isFinite(fadeOption) ? 1 : Math.min(1, Math.max(0, fadeOption))
   const rowHeight = options.rowHeight ?? 48
   const columnGap = options.columnGap ?? 48
   const linkStyle: LinkStyle = options.linkStyle ?? 'orthogonal'
@@ -596,14 +605,17 @@ export function createBidirectionalTree(
         ? customLinkPath(toLinkCtx(l))
         : linkPath(l, columnGap, linkStyle, orientation)
     const interpolating = animate && !customLinkPath
+    // 淡入淡出只随动画路径生效；透明度与路径形变正交，自定义连线同样适用
+    const fading = animate && fade < 1
 
-    if (interpolating) {
-      link
-        .exit<LayoutLink>()
-        .transition()
-        .duration(duration)
-        .attr('d', () => degenerateLinkPath(end, linkStyle, orientation))
-        .remove()
+    if (interpolating || fading) {
+      const exitLinks = link.exit<LayoutLink>()
+      // d3 过渡首帧才读起始值，缺失的 opacity 会按 0 插值（老节点闪没）；先补齐为 1
+      if (fading) exitLinks.attr('opacity', normalizeOpacity)
+      const linkExitT = exitLinks.transition().duration(duration)
+      if (interpolating) linkExitT.attr('d', () => degenerateLinkPath(end, linkStyle, orientation))
+      if (fading) linkExitT.attr('opacity', fade)
+      linkExitT.remove()
     } else {
       link.exit<LayoutLink>().remove()
     }
@@ -615,15 +627,24 @@ export function createBidirectionalTree(
       .attr('fill', 'none')
       .attr('stroke', linkColorOf)
       .attr('stroke-width', linkWidthOf)
+      .attr('opacity', fading ? fade : null)
       .attr('d', d => (interpolating ? degenerateLinkPath(start, linkStyle, orientation) : dOf(d)))
     const linkMerged = linkEnter.merge(link)
     if (interpolating) {
-      linkMerged
+      const linkT = linkMerged
         .transition()
         .duration(duration)
         .attr('d', dOf)
+      if (fading) {
+        linkMerged.attr('opacity', normalizeOpacity)
+        linkT.attr('opacity', 1)
+      }
     } else {
       linkMerged.attr('d', dOf)
+      if (fading) {
+        linkMerged.attr('opacity', normalizeOpacity)
+        linkMerged.transition().duration(duration).attr('opacity', 1)
+      }
     }
     // 颜色/线宽逐 path 刷新（attr 优先级低于 CSS，用户仍可用 .d3t-link 覆盖）
     linkMerged.attr('stroke', linkColorOf).attr('stroke-width', linkWidthOf)
@@ -635,12 +656,14 @@ export function createBidirectionalTree(
       .data(layout.nodes, d => d.key)
 
     if (animate) {
-      node
-        .exit<LayoutNode>()
+      const exitNodes = node.exit<LayoutNode>()
+      if (fading) exitNodes.attr('opacity', normalizeOpacity)
+      const nodeExitT = exitNodes
         .transition()
         .duration(duration)
         .attr('transform', `translate(${end.x},${end.y})`)
-        .remove()
+      if (fading) nodeExitT.attr('opacity', fade)
+      nodeExitT.remove()
     } else {
       node.exit<LayoutNode>().remove()
     }
@@ -651,6 +674,7 @@ export function createBidirectionalTree(
       .attr('class', nodeClass)
       .attr('data-id', d => d.data.id)
       .attr('transform', () => `translate(${start.x},${start.y})`)
+      .attr('opacity', fading ? fade : null)
       .attr('cursor', d => (d.variant === 'root' ? 'default' : 'pointer'))
       .on('click', (_event, d) => {
         if (d.variant === 'aggregate') {
@@ -733,10 +757,12 @@ export function createBidirectionalTree(
 
     const nodeMerged = nodeEnter.merge(node)
     if (animate) {
-      nodeMerged
+      if (fading) nodeMerged.attr('opacity', normalizeOpacity)
+      const nodeT = nodeMerged
         .transition()
         .duration(duration)
         .attr('transform', d => `translate(${d.x},${d.y})`)
+      if (fading) nodeT.attr('opacity', 1)
     } else {
       nodeMerged.attr('transform', d => `translate(${d.x},${d.y})`)
     }

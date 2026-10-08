@@ -166,3 +166,13 @@ linkBtn.addEventListener('click', () => {
   ;(options as { linkStyle?: string }).linkStyle = next
   tree = createBidirectionalTree(container, options)
 })
+const fadeSeq = [1, 0.6, 0.25] as const
+let fadeIdx = 0
+const fadeBtn = document.querySelector<HTMLButtonElement>('#btn-fade')!
+fadeBtn.addEventListener('click', () => {
+  fadeIdx = (fadeIdx + 1) % fadeSeq.length
+  fadeBtn.textContent = `淡入淡出：${fadeSeq[fadeIdx] === 1 ? '关' : fadeSeq[fadeIdx]}`
+  tree.destroy()
+  ;(options as { fadeOpacity?: number }).fadeOpacity = fadeSeq[fadeIdx]
+  tree = createBidirectionalTree(container, options)
+})
