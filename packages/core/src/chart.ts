@@ -1,4 +1,4 @@
-import { select } from 'd3'
+import { select, zoom, ZoomTransform } from 'd3'
 import { computeLayout, degenerateLinkPath, linkPath } from './layout'
 import type { LayoutLink, LayoutNode } from './layout'
 import { createCanvasMeasurer } from './measure'
@@ -24,6 +24,16 @@ function findDataById(root: TreeNodeData, id: string): TreeNodeData | undefined 
     if (hit) return hit
   }
   return undefined
+}
+
+/** 查找指定 id 的父节点（返回其直接持有者） */
+function findParentOf(root: TreeNodeData, id: string): TreeNodeData | null {
+  for (const child of root.children ?? []) {
+    if (child.id === id) return root
+    const hit = findParentOf(child, id)
+    if (hit) return hit
+  }
+  return null
 }
 
 function countDescendants(node: TreeNodeData): number {
@@ -69,7 +79,10 @@ export function createBidirectionalTree(
     .style('height', '100%')
     .style('display', 'block')
     .style('background', '#FFFFFF')
-  const gChart = svg.append('g').attr('class', 'd3t-chart')
+    .attr('cursor', 'grab')
+  // 缩放层（承载 zoom 变换）与内容层（承载居中平移）分离，避免变换互相覆盖
+  const gZoom = svg.append('g').attr('class', 'd3t-zoom')
+  const gChart = gZoom.append('g').attr('class', 'd3t-chart')
   const gLink = gChart
     .append('g')
     .attr('class', 'd3t-links')
@@ -77,6 +90,14 @@ export function createBidirectionalTree(
     .attr('stroke', theme.link)
     .attr('stroke-width', theme.linkWidth)
   const gNode = gChart.append('g').attr('class', 'd3t-nodes')
+
+  const zoomBehavior = zoom<SVGSVGElement, unknown>()
+    .scaleExtent([0.1, 4])
+    .extent(() => [[0, 0], [container.clientWidth || 800, container.clientHeight || 600]])
+    .on('zoom', event => {
+      gZoom.attr('transform', event.transform.toString())
+    })
+  svg.call(zoomBehavior).on('dblclick.zoom', null)
 
   let currentData: TreeNodeData = options.data
   let collapsedIds = seedCollapsed(currentData)
@@ -242,7 +263,8 @@ export function createBidirectionalTree(
           return
         }
         options.onNodeClick?.(d.data)
-        if (d.variant !== 'root') toggleById(d.data.id)
+        options.onNodeSelect?.(d.data)
+        if (d.variant !== 'root' && options.toggleOnNodeClick !== false) toggleById(d.data.id)
       })
 
     nodeEnter
@@ -327,11 +349,12 @@ export function createBidirectionalTree(
 
   return {
     setData(data) {
+      const sourceKey = currentData.id
       currentData = data
       collapsedIds = seedCollapsed(data)
       revealed = new Map()
       positions.clear()
-      render()
+      render(sourceKey)
     },
     toggle(id) {
       toggleById(id)
@@ -352,6 +375,45 @@ export function createBidirectionalTree(
       })
       revealed.clear()
       render(currentData.id)
+    },
+    addChild(parentId, node, side) {
+      const parent = findDataById(currentData, parentId)
+      if (!parent) return false
+      const child =
+        side && parentId === currentData.id ? { ...node, side } : node
+      parent.children = [...(parent.children ?? []), child]
+      collapsedIds.delete(parentId)
+      render(parentId)
+      return true
+    },
+    removeChild(id) {
+      if (id === currentData.id) return false
+      const parent = findParentOf(currentData, id)
+      if (!parent?.children?.some(c => c.id === id)) return false
+      parent.children = parent.children.filter(c => c.id !== id)
+      revealed.delete(id)
+      render(parent.id)
+      return true
+    },
+    zoomToFit() {
+      const layout = computeLayout(
+        currentData,
+        { measureText, rowHeight, columnGap },
+        collapsedIds,
+        { limit: visibleChildrenLimit, revealed },
+      )
+      const { minX, maxX, minY, maxY } = layout.bounds
+      const { width, height } = size()
+      const pad = 40
+      const k = Math.min((width - pad) / Math.max(maxX - minX, 1), (height - pad) / Math.max(maxY - minY, 1), 1)
+      const cx = (minX + maxX) / 2
+      const cy = (minY + maxY) / 2
+      const t = new ZoomTransform(k, width / 2 - k * cx, height / 2 - k * cy)
+      if (duration > 0) {
+        svg.transition().duration(duration).call(zoomBehavior.transform, t)
+      } else {
+        svg.call(zoomBehavior.transform, t)
+      }
     },
     destroy() {
       svg.remove()

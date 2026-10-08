@@ -50,7 +50,10 @@ export interface TreeOptions {
   loadChildren?: (parent: TreeNodeData) => Promise<TreeNodeData[]>
   onNodeClick?: (node: TreeNodeData) => void
   onNodeToggle?: (node: TreeNodeData, collapsed: boolean) => void
-  onNodeSelect?: (node: TreeNodeData | null) => void
+  /** 任何非聚合节点被点击时广播（含根节点）；供选取/编辑流程使用 */
+  onNodeSelect?: (node: TreeNodeData) => void
+  /** 点击节点本体是否触发折叠切换，默认 true；置 false 后点击仅触发回调（编辑选取模式） */
+  toggleOnNodeClick?: boolean
 }
 
 /** createBidirectionalTree 返回的图表实例（命令式 API） */
@@ -63,6 +66,15 @@ export interface TreeInstance {
   expandAll(): void
   /** 收起全部可折叠节点（根不可折叠，根与一级板块保留可见） */
   collapseAll(): void
+  /**
+   * 追加子节点。parent 为根节点时可用 side 指定分侧（缺省自动均分侧）；
+   * 父节点处于折叠态会自动展开。返回是否成功。
+   */
+  addChild(parentId: string, node: TreeNodeData, side?: Side): boolean
+  /** 删除指定节点及其子树（根节点不可删除）。返回是否成功。 */
+  removeChild(id: string): boolean
+  /** 缩放平移使当前可见内容完整落入视口（含边距，只缩小不放大） */
+  zoomToFit(): void
   /** 移除 SVG 与全部监听 */
   destroy(): void
 }

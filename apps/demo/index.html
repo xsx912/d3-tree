@@ -14,7 +14,25 @@
       header h1 { font-size: 16px; color: #303133; font-weight: 600; }
       nav a { font-size: 13px; color: #1E6EFF; text-decoration: none; margin-right: 12px; }
       nav a:hover { text-decoration: underline; }
-      #chart { width: 100vw; height: calc(100vh - 46px); }
+      #toolbar {
+        display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+        padding: 8px 20px; border-bottom: 1px solid #EBEEF5; background: #FAFAFA;
+      }
+      #toolbar button {
+        padding: 5px 12px; font-size: 13px; border: 1px solid #DCDFE6; border-radius: 4px;
+        background: #fff; color: #303133; cursor: pointer;
+      }
+      #toolbar button:hover { border-color: #1E6EFF; color: #1E6EFF; }
+      #toolbar button.primary { background: #1E6EFF; border-color: #1E6EFF; color: #fff; }
+      #toolbar button.primary:hover { opacity: 0.88; }
+      #toolbar input {
+        padding: 5px 10px; font-size: 13px; border: 1px solid #DCDFE6; border-radius: 4px;
+        outline: none; width: 160px;
+      }
+      #toolbar input:focus { border-color: #1E6EFF; }
+      #hint { font-size: 13px; color: #909399; }
+      #hint.active { color: #E8684A; }
+      #chart { width: 100vw; height: calc(100vh - 96px); }
     </style>
   </head>
   <body>
@@ -26,6 +44,18 @@
         <a href="/react.html">React</a>
       </nav>
     </header>
+    <div id="toolbar">
+      <button id="btn-add">追加子节点</button>
+      <input id="node-name" placeholder="新节点名称" hidden />
+      <button id="btn-confirm" class="primary" hidden>确认追加</button>
+      <button id="btn-cancel" hidden>取消</button>
+      <button id="btn-remove">删除节点</button>
+      <span style="width: 1px; height: 18px; background: #DCDFE6;"></span>
+      <button id="btn-expand">全展开</button>
+      <button id="btn-collapse">全收起</button>
+      <button id="btn-fit">适配视窗</button>
+      <span id="hint">点击节点可折叠/展开；滚轮缩放、拖拽平移</span>
+    </div>
     <div id="chart"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
