@@ -1,2 +1,11 @@
-// 工单08 将在此实现 <BidirectionalTree> React 组件封装
-export {}
+export { BidirectionalTree } from './BidirectionalTree'
+export type { BidirectionalTreeHandle, BidirectionalTreeProps } from './BidirectionalTree'
+export type {
+  ExportImageOptions,
+  LinkStyle,
+  Side,
+  TextMeasurer,
+  TreeInstance,
+  TreeNodeData,
+  TreeOptions,
+} from '@d3-tree/core'
