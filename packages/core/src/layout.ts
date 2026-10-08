@@ -10,10 +10,19 @@ import type { LinkStyle, Side, TextMeasurer, TreeNodeData } from './types'
  * 横向按深度分列（列起点 = 前列起点 + 该列最大节点宽 + columnGap）→ 左侧取负镜像 → 两侧根对齐 (0,0)。
  */
 
-/** 展示树包装：引用原始数据对象，children 为过滤后的可见子集（折叠的子树不进入） */
+/** 展示树包装：引用原始数据对象，children 为过滤后的可见子集（折叠子树不进入） */
 interface DisplayNode {
   original: TreeNodeData
   children?: DisplayNode[]
+  /** 聚合虚拟节点标记（“展开 (N)”） */
+  aggregate?: true
+}
+
+export interface AggregateConfig {
+  /** 每父节点默认可见子节点上限；0 = 不聚合 */
+  limit: number
+  /** 每父节点已额外释放的数量（超出 limit 的部分） */
+  revealed: Map<string, number>
 }
 
 export interface LayoutNode {
@@ -58,9 +67,32 @@ export interface LayoutConfig {
   columnGap: number
 }
 
-function buildDisplay(node: TreeNodeData, collapsedIds: Set<string>): DisplayNode {
-  if (!collapsedIds.has(node.id) && node.children?.length) {
-    return { original: node, children: node.children.map(c => buildDisplay(c, collapsedIds)) }
+function buildDisplay(
+  node: TreeNodeData,
+  collapsedIds: Set<string>,
+  agg: AggregateConfig,
+  side: 'left' | 'right',
+): DisplayNode {
+  const children = node.children ?? []
+  if (!collapsedIds.has(node.id) && children.length) {
+    let visible = children
+    let aggregate: DisplayNode | undefined
+    if (agg.limit > 0 && children.length > agg.limit) {
+      const take = Math.min(agg.limit + (agg.revealed.get(node.id) ?? 0), children.length)
+      visible = children.slice(0, take)
+      const remaining = children.length - visible.length
+      if (remaining > 0) {
+        const name = side === 'left' ? `< 展开 (${remaining})` : `展开 (${remaining}) >`
+        aggregate = { original: { id: `__agg__${node.id}`, name } }
+      }
+    }
+    return {
+      original: node,
+      children: [
+        ...visible.map(c => buildDisplay(c, collapsedIds, agg, side)),
+        ...(aggregate ? [{ ...aggregate, aggregate: true as const }] : []),
+      ],
+    }
   }
   return { original: node }
 }
@@ -82,6 +114,7 @@ export function computeLayout(
   rootData: TreeNodeData,
   config: LayoutConfig,
   collapsedIds: Set<string> = new Set(),
+  agg: AggregateConfig = { limit: 0, revealed: new Map() },
 ): LayoutResult {
   const { measureText, rowHeight, columnGap } = config
   const nodes: LayoutNode[] = []
@@ -113,7 +146,7 @@ export function computeLayout(
     // 合成侧根：不可渲染，仅用于让 d3.tree 以根为 (0,0) 展开一侧子树
     const synthetic: DisplayNode = {
       original: rootData,
-      children: sideChildren.map(c => buildDisplay(c, collapsedIds)),
+      children: sideChildren.map(c => buildDisplay(c, collapsedIds, agg, side)),
     }
     const h = hierarchy<DisplayNode>(synthetic, d => d.children)
     const laidOut = tree<DisplayNode>()
@@ -137,7 +170,8 @@ export function computeLayout(
     laidOut.each(n => {
       if (n.depth === 0) return
       const d = n.data.original
-      const width = measureText(d.name, 'node')
+      const variant: LayoutNode['variant'] = n.data.aggregate === true ? 'aggregate' : 'node'
+      const width = measureText(d.name, variant)
       const columnStart = colEdge.get(n.depth) ?? 0
       const center = side === 'right' ? columnStart + width / 2 : -(columnStart + width / 2)
       const parentId =
@@ -146,7 +180,7 @@ export function computeLayout(
       const node: LayoutNode = {
         key: d.id,
         data: d,
-        variant: 'node',
+        variant,
         name: d.name,
         side,
         depth: n.depth,

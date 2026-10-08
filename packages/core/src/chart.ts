@@ -59,6 +59,7 @@ export function createBidirectionalTree(
   const rowHeight = options.rowHeight ?? 48
   const columnGap = options.columnGap ?? 48
   const linkStyle: LinkStyle = options.linkStyle ?? 'orthogonal'
+  const visibleChildrenLimit = options.visibleChildrenLimit ?? 5
   const measureText: TextMeasurer = options.measureText ?? createCanvasMeasurer()
 
   const svg = select(container)
@@ -79,6 +80,8 @@ export function createBidirectionalTree(
 
   let currentData: TreeNodeData = options.data
   let collapsedIds = seedCollapsed(currentData)
+  /** 聚合释放状态：父 id → 已额外释放的子节点数（超出 visibleChildrenLimit 部分） */
+  let revealed = new Map<string, number>()
   /** 上一帧渲染的节点位置（key → 中心点），供 enter 过渡起点与 exit 收拢目标使用 */
   const positions = new Map<string, Position>()
 
@@ -119,8 +122,55 @@ export function createBidirectionalTree(
     render(id)
   }
 
+  function setAggLoading(aggKey: string, loading: boolean): void {
+    gNode
+      .selectAll<SVGGElement, LayoutNode>('g.d3t-node')
+      .filter(n => n.key === aggKey)
+      .classed('d3t-loading', loading)
+  }
+
+  /** 点击“展开 (N)”：本地数据分批释放；配置 loadChildren 时先异步拉取并入 */
+  function revealByParent(parentId: string): void {
+    const parent = findDataById(currentData, parentId)
+    if (!parent) return
+    const loader = options.loadChildren
+    if (loader) {
+      const aggKey = `__agg__${parentId}`
+      setAggLoading(aggKey, true)
+      loader(parent)
+        .then(fetched => {
+          const existing = new Set((parent.children ?? []).map(c => c.id))
+          parent.children = [...(parent.children ?? [])]
+          for (const child of fetched) {
+            if (!existing.has(child.id)) parent.children!.push(child)
+          }
+          // 回调返回的子节点并入数据后全部可见
+          revealed.set(
+            parentId,
+            Math.max(0, parent.children!.length - visibleChildrenLimit),
+          )
+          setAggLoading(aggKey, false)
+          render(parentId)
+        })
+        .catch(() => setAggLoading(aggKey, false))
+      return
+    }
+    revealed.set(parentId, (revealed.get(parentId) ?? 0) + visibleChildrenLimit)
+    render(parentId)
+  }
+
+  function walkAll(node: TreeNodeData, fn: (n: TreeNodeData) => void): void {
+    fn(node)
+    for (const child of node.children ?? []) walkAll(child, fn)
+  }
+
   function render(sourceKey?: string): void {
-    const layout = computeLayout(currentData, { measureText, rowHeight, columnGap }, collapsedIds)
+    const layout = computeLayout(
+      currentData,
+      { measureText, rowHeight, columnGap },
+      collapsedIds,
+      { limit: visibleChildrenLimit, revealed },
+    )
     const { width, height } = size()
     gChart.attr('transform', `translate(${width / 2},${height / 2})`)
 
@@ -187,6 +237,10 @@ export function createBidirectionalTree(
       .attr('transform', () => `translate(${start.x},${start.y})`)
       .attr('cursor', d => (d.variant === 'root' ? 'default' : 'pointer'))
       .on('click', (event, d) => {
+        if (d.variant === 'aggregate') {
+          revealByParent(d.parentId)
+          return
+        }
         options.onNodeClick?.(d.data)
         if (d.variant !== 'root') toggleById(d.data.id)
       })
@@ -212,9 +266,9 @@ export function createBidirectionalTree(
       .attr('fill', textColor)
       .text(d => d.name)
 
-    // +/− 徽标（根节点除外）：外侧圆形控件，独立点击热区
+    // +/− 徽标（仅普通节点；根节点与聚合虚拟节点不展示）
     const badge = nodeEnter
-      .filter(d => d.variant !== 'root')
+      .filter(d => d.variant === 'node')
       .append('g')
       .attr('class', 'd3t-badge')
       .attr('cursor', 'pointer')
@@ -275,11 +329,29 @@ export function createBidirectionalTree(
     setData(data) {
       currentData = data
       collapsedIds = seedCollapsed(data)
+      revealed = new Map()
       positions.clear()
       render()
     },
     toggle(id) {
       toggleById(id)
+    },
+    expandAll() {
+      collapsedIds.clear()
+      if (visibleChildrenLimit > 0) {
+        walkAll(currentData, n => {
+          if (n.children?.length) revealed.set(n.id, n.children.length)
+        })
+      }
+      render(currentData.id)
+    },
+    collapseAll() {
+      collapsedIds.clear()
+      walkAll(currentData, n => {
+        if (n.children?.length && n.id !== currentData.id) collapsedIds.add(n.id)
+      })
+      revealed.clear()
+      render(currentData.id)
     },
     destroy() {
       svg.remove()

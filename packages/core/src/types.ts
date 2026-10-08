@@ -59,6 +59,10 @@ export interface TreeInstance {
   setData(data: TreeNodeData): void
   /** 切换指定节点的折叠态（根节点不可折叠） */
   toggle(id: string): void
+  /** 展开全部节点（含释放全部“展开 (N)”聚合） */
+  expandAll(): void
+  /** 收起全部可折叠节点（根不可折叠，根与一级板块保留可见） */
+  collapseAll(): void
   /** 移除 SVG 与全部监听 */
   destroy(): void
 }
