@@ -1,12 +1,25 @@
 {
   "name": "@d3-tree/vue",
   "version": "0.1.0",
-  "description": "@d3-tree/core 的 Vue 3 组件封装（工单07 实现）",
+  "description": "@d3-tree/core 的 Vue 3 组件封装",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
   "peerDependencies": {
     "@d3-tree/core": "workspace:*",
     "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "@d3-tree/core": "workspace:*",
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.0",
+    "vue": "^3.5.0"
   }
 }

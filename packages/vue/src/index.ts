@@ -1,2 +1,11 @@
-// 工单07 将在此实现 <BidirectionalTree> Vue 3 组件封装
-export {}
+export { BidirectionalTree } from './BidirectionalTree'
+export type { BidirectionalTreeExposed } from './BidirectionalTree'
+export type {
+  ExportImageOptions,
+  LinkStyle,
+  Side,
+  TextMeasurer,
+  TreeInstance,
+  TreeNodeData,
+  TreeOptions,
+} from '@d3-tree/core'
