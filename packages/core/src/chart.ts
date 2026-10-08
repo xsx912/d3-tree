@@ -799,7 +799,13 @@ export function createBidirectionalTree(
       const k = Math.min((width - pad) / Math.max(maxX - minX, 1), (height - pad) / Math.max(maxY - minY, 1), 1)
       const cx = (minX + maxX) / 2
       const cy = (minY + maxY) / 2
-      const t = new ZoomTransform(k, width / 2 - k * cx, height / 2 - k * cy)
+      // 内容层 gChart 自带居中平移 (width/2, height/2)，zoom 变换须先抵消该偏移再居中：
+      // 内容中心屏幕坐标 = k*(width/2 + cx) + tx，令其等于 width/2
+      const t = new ZoomTransform(
+        k,
+        width / 2 - k * (width / 2 + cx),
+        height / 2 - k * (height / 2 + cy),
+      )
       if (duration > 0) {
         svg.transition().duration(duration).call(zoomBehavior.transform, t)
       } else {

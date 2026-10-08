@@ -74,22 +74,41 @@ describe('缩放与增删节点（工单04）', () => {
     expect(tree.removeChild('nope')).toBe(false)
   })
 
-  it('zoomToFit：小内容缩放限制为 1，宽内容自动缩小', () => {
+  it('zoomToFit：小内容缩放限制为 1，宽内容自动缩小；内容中心必须落在视口中心', () => {
+    /** 解析 g.d3t-zoom 的 translate/scale，返回根节点（布局原点）的屏幕坐标 */
+    function rootScreenX(container: HTMLElement): number {
+      const t = container.querySelector('g.d3t-zoom')!.getAttribute('transform') ?? ''
+      const m = /translate\(([-\d.]+),([-\d.]+)\) scale\(([\d.]+)\)/.exec(t)
+      expect(m, `transform 形如 translate(x,y) scale(k)：${t}`).toBeTruthy()
+      const tx = Number(m![1])
+      const k = Number(m![3])
+      return tx + k * 400 // 布局原点经 gChart 居中偏移 800/2=400 后再施加 zoom
+    }
+
     // 小树：视口 800×600（jsdom 容器为 0 时回退），内容远小于视口 → k = 1
     const small = mount(fixture())
     small.tree.zoomToFit()
     expect(
       small.container.querySelector('g.d3t-zoom')!.getAttribute('transform'),
     ).toContain('scale(1)')
+    expect(Math.abs(rootScreenX(small.container) - 400)).toBeLessThan(1)
 
-    // 宽树：右侧 10 层链，内容宽度超出视口 → k < 1
+    // 宽树：左右各 10 层对称链，内容宽度超出视口 → k < 1；对称数据下根节点即内容中心
     let deep: TreeNodeData = { id: 'd10', name: '十层节点' }
     for (let i = 9; i >= 1; i--) deep = { id: `d${i}`, name: `层${i}`, children: [deep] }
-    const wide = mount({ id: 'root', name: '根', children: [{ ...deep, side: 'right' }] })
+    const mirror = structuredClone(deep)
+    const wide = mount({
+      id: 'root',
+      name: '根',
+      children: [
+        { ...deep, side: 'right' },
+        { ...mirror, side: 'left' },
+      ],
+    })
     wide.tree.zoomToFit()
-    expect(wide.container.querySelector('g.d3t-zoom')!.getAttribute('transform')).toMatch(
-      /scale\(0\.\d+\)/,
-    )
+    const t = wide.container.querySelector('g.d3t-zoom')!.getAttribute('transform')!
+    expect(t).toMatch(/scale\(0\.\d+\)/)
+    expect(Math.abs(rootScreenX(wide.container) - 400)).toBeLessThan(1)
   })
 
   it('toggleOnNodeClick: false 时点击仅广播 onNodeSelect，不触发折叠', () => {
