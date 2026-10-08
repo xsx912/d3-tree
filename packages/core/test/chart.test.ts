@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createBidirectionalTree } from '../src'
-import { theme } from '../src/theme'
+import { createBidirectionalTree, theme } from '../src'
 import type { TreeNodeData } from '../src'
 
 /** 固定宽度度量：文本长度 × 系数 + 内边距，保证布局断言确定性 */

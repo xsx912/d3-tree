@@ -163,7 +163,8 @@ export function computeLayout(
     const colMax = new Map<number, number>()
     laidOut.each(n => {
       if (n.depth === 0) return
-      const w = measureText(n.data.original.name, 'node')
+      const variant: LayoutNode['variant'] = n.data.aggregate === true ? 'aggregate' : 'node'
+      const w = measureText(n.data.original.name, variant)
       colMax.set(n.depth, Math.max(colMax.get(n.depth) ?? 0, w))
     })
     const colEdge = new Map<number, number>()

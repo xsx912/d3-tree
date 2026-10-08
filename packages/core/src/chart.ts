@@ -4,6 +4,7 @@ import type { LayoutLink, LayoutNode, LayoutResult } from './layout'
 import { createCanvasMeasurer } from './measure'
 import { theme } from './theme'
 import type {
+  ExportImageOptions,
   LinkStyle,
   TextMeasurer,
   TreeInstance,
@@ -355,11 +356,7 @@ export function createBidirectionalTree(
     }
   }
 
-  async function exportImageImpl(opts: {
-    format?: 'svg' | 'png'
-    scale?: number
-    filename?: string
-  }): Promise<void> {
+  async function exportImageImpl(opts: ExportImageOptions): Promise<void> {
     const format = opts.format ?? 'png'
     const scale = opts.scale ?? 2
     const filename = opts.filename ?? 'bidirectional-tree'
@@ -495,14 +492,19 @@ export function createBidirectionalTree(
     for (const child of node.children ?? []) walkAll(child, fn)
   }
 
-  function render(sourceKey?: string): void {
-    const layout = computeLayout(
+  /** 以当前视图状态（折叠/聚合/分组过滤）计算布局 */
+  function currentLayout(): LayoutResult {
+    return computeLayout(
       currentData,
       { measureText, rowHeight, columnGap },
       collapsedIds,
       { limit: visibleChildrenLimit, revealed },
       visibleGroups,
     )
+  }
+
+  function render(sourceKey?: string): void {
+    const layout = currentLayout()
     const { width, height } = size()
     gChart.attr('transform', `translate(${width / 2},${height / 2})`)
 
@@ -667,8 +669,9 @@ export function createBidirectionalTree(
   }
 
   // 容器尺寸就绪或变化时重新居中（修复挂载早于布局时的偏移，如 Vue onMounted 场景）
+  let resizeObserver: ResizeObserver | undefined
   if (typeof ResizeObserver !== 'undefined') {
-    const resizeObserver = new ResizeObserver(() => {
+    resizeObserver = new ResizeObserver(() => {
       const { width, height } = size()
       gChart.attr('transform', `translate(${width / 2},${height / 2})`)
     })
@@ -735,13 +738,7 @@ export function createBidirectionalTree(
       return true
     },
     zoomToFit() {
-      const layout = computeLayout(
-        currentData,
-        { measureText, rowHeight, columnGap },
-        collapsedIds,
-        { limit: visibleChildrenLimit, revealed },
-        visibleGroups,
-      )
+      const layout = currentLayout()
       const { minX, maxX, minY, maxY } = layout.bounds
       const { width, height } = size()
       const pad = 40
@@ -769,6 +766,7 @@ export function createBidirectionalTree(
       return exportImageImpl(options ?? {})
     },
     destroy() {
+      resizeObserver?.disconnect()
       svg.remove()
       tooltipEl.remove()
       styleEl.remove()
