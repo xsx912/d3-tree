@@ -86,6 +86,7 @@ function onGroupsChange(gs: Array<{ name: string; color: string }>): void {
       <a href="/index.html">原生</a>
       <a href="/vue.html">Vue</a>
       <a href="/react.html">React</a>
+      <a href="/custom.html">自定义</a>
     </nav>
   </header>
   <div id="toolbar">

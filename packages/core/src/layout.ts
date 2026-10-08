@@ -1,6 +1,13 @@
 import { hierarchy, tree } from 'd3'
 import { theme } from './theme'
-import type { LinkStyle, Side, TextMeasurer, TreeNodeData } from './types'
+import type {
+  LinkStyle,
+  NodeSizeFn,
+  NodeVariant,
+  Side,
+  TextMeasurer,
+  TreeNodeData,
+} from './types'
 
 /**
  * 双向树布局引擎（纯函数）。
@@ -65,6 +72,8 @@ export interface LayoutConfig {
   measureText: TextMeasurer
   rowHeight: number
   columnGap: number
+  /** 节点几何来源（chart 层默认：文字度量宽 + 内置高度） */
+  nodeSize: NodeSizeFn
 }
 
 function buildDisplay(
@@ -120,11 +129,12 @@ export function computeLayout(
   agg: AggregateConfig = { limit: 0, revealed: new Map() },
   visibleGroups: Set<string> | null = null,
 ): LayoutResult {
-  const { measureText, rowHeight, columnGap } = config
+  const { nodeSize, rowHeight, columnGap } = config
   const nodes: LayoutNode[] = []
   const links: LayoutLink[] = []
   const byId = new Map<string, LayoutNode>()
 
+  const rootSize = nodeSize(rootData, 'root')
   const rootNode: LayoutNode = {
     key: rootData.id,
     data: rootData,
@@ -132,8 +142,8 @@ export function computeLayout(
     name: rootData.name,
     side: 'center',
     depth: 0,
-    width: measureText(rootData.name, 'root'),
-    height: theme.rootHeight,
+    width: rootSize.width,
+    height: rootSize.height,
     x: 0,
     y: 0,
     parentId: '',
@@ -164,7 +174,7 @@ export function computeLayout(
     laidOut.each(n => {
       if (n.depth === 0) return
       const variant: LayoutNode['variant'] = n.data.aggregate === true ? 'aggregate' : 'node'
-      const w = measureText(n.data.original.name, variant)
+      const w = nodeSize(n.data.original, variant).width
       colMax.set(n.depth, Math.max(colMax.get(n.depth) ?? 0, w))
     })
     const colEdge = new Map<number, number>()
@@ -178,7 +188,8 @@ export function computeLayout(
       if (n.depth === 0) return
       const d = n.data.original
       const variant: LayoutNode['variant'] = n.data.aggregate === true ? 'aggregate' : 'node'
-      const width = measureText(d.name, variant)
+      const size = nodeSize(d, variant)
+      const width = size.width
       const columnStart = colEdge.get(n.depth) ?? 0
       const center = side === 'right' ? columnStart + width / 2 : -(columnStart + width / 2)
       const parentId =
@@ -192,7 +203,7 @@ export function computeLayout(
         side,
         depth: n.depth,
         width,
-        height: theme.nodeHeight,
+        height: size.height,
         x: center,
         y: n.x,
         parentId,

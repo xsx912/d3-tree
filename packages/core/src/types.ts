@@ -24,6 +24,29 @@ export type TextMeasurer = (text: string, variant: NodeVariant) => number
 
 export type LinkStyle = 'orthogonal' | 'diagonal'
 
+/** 节点几何函数：返回节点宽高（坐标系以节点中心为原点） */
+export type NodeSizeFn = (
+  data: TreeNodeData,
+  variant: NodeVariant,
+) => { width: number; height: number }
+
+/** 自定义节点渲染上下文：group 已定位在节点中心，向其 append 任意 SVG 内容 */
+export interface NodeRenderContext {
+  group: SVGGElement
+  data: TreeNodeData
+  variant: NodeVariant
+  side: Side | 'center'
+  depth: number
+  width: number
+  height: number
+}
+
+/** SVG 自定义渲染器（优先于 nodeTemplate 与默认渲染；导出 PNG/SVG 无损） */
+export type NodeRenderer = (context: NodeRenderContext) => void
+
+/** HTML 模板：返回 HTML 字符串或元素，渲染进节点 foreignObject（导出 PNG 需内联样式） */
+export type NodeTemplate = (data: TreeNodeData, variant: NodeVariant) => string | HTMLElement
+
 export interface TooltipOptions {
   /** 自定义 tooltip 内容（返回 HTML 字符串）；缺省渲染 properties 键值表 */
   formatter?: (node: TreeNodeData) => string
@@ -43,6 +66,12 @@ export interface TreeOptions {
   linkStyle?: LinkStyle
   /** 按 group 字段着色（内置调色板，配白色文字）；默认 false 保持参考稿白节点风格 */
   colorByGroup?: boolean
+  /** 节点几何：宽高完全自定义；缺省按内置文字度量（变宽）+ 34/44 高 */
+  nodeSize?: NodeSizeFn
+  /** 完全自定义节点渲染（SVG）；提供后替代默认圆角矩形+文字 */
+  nodeRenderer?: NodeRenderer
+  /** HTML 模板渲染进 foreignObject；nodeRenderer 优先于它 */
+  nodeTemplate?: NodeTemplate
   /** 文本度量器注入（测试用）；缺省离屏 canvas measureText */
   measureText?: TextMeasurer
   /** 节点着色回调（非根节点），返回 CSS 颜色 */

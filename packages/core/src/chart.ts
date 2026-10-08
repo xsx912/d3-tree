@@ -6,6 +6,10 @@ import { theme } from './theme'
 import type {
   ExportImageOptions,
   LinkStyle,
+  NodeRenderContext,
+  NodeRenderer,
+  NodeSizeFn,
+  NodeTemplate,
   TextMeasurer,
   TreeInstance,
   TreeNodeData,
@@ -35,6 +39,27 @@ function findDataById(root: TreeNodeData, id: string): TreeNodeData | undefined 
     if (hit) return hit
   }
   return undefined
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg'
+const XHTML_NS = 'http://www.w3.org/1999/xhtml'
+
+/** 将 HTML 模板包装为 foreignObject 渲染器；XHTML 命名空间保证 SVG 序列化与 PNG 导出兼容 */
+function createTemplateRenderer(template: NodeTemplate): NodeRenderer {
+  return ({ group, data, variant, width, height }) => {
+    const fo = document.createElementNS(SVG_NS, 'foreignObject')
+    fo.setAttribute('x', `${-width / 2}`)
+    fo.setAttribute('y', `${-height / 2}`)
+    fo.setAttribute('width', `${width}`)
+    fo.setAttribute('height', `${height}`)
+    const div = document.createElementNS(XHTML_NS, 'div')
+    div.setAttribute('style', 'width:100%;height:100%;box-sizing:border-box;')
+    const content = template(data, variant)
+    if (typeof content === 'string') div.innerHTML = content
+    else div.appendChild(content)
+    fo.appendChild(div)
+    group.appendChild(fo)
+  }
 }
 
 /** 查找指定 id 的父节点（返回其直接持有者） */
@@ -82,6 +107,19 @@ export function createBidirectionalTree(
   const linkStyle: LinkStyle = options.linkStyle ?? 'orthogonal'
   const visibleChildrenLimit = options.visibleChildrenLimit ?? 5
   const measureText: TextMeasurer = options.measureText ?? createCanvasMeasurer()
+  /** 节点几何来源：默认文字度量宽 + 内置高度；nodeSize 完全接管 */
+  const sizeOf: NodeSizeFn =
+    options.nodeSize ??
+    ((data, variant) => ({
+      width: measureText(data.name, variant),
+      height: variant === 'root' ? theme.rootHeight : theme.nodeHeight,
+    }))
+  /** 自定义渲染模式：用户完全接管节点内容时，core 不再刷新默认填充/文字色 */
+  const customNodeRender: NodeRenderer | undefined =
+    options.nodeRenderer ??
+    (options.nodeTemplate
+      ? createTemplateRenderer(options.nodeTemplate)
+      : undefined)
 
   const svg = select(container)
     .append('svg')
@@ -496,7 +534,7 @@ export function createBidirectionalTree(
   function currentLayout(): LayoutResult {
     return computeLayout(
       currentData,
-      { measureText, rowHeight, columnGap },
+      { measureText, rowHeight, columnGap, nodeSize: sizeOf },
       collapsedIds,
       { limit: visibleChildrenLimit, revealed },
       visibleGroups,
@@ -583,26 +621,40 @@ export function createBidirectionalTree(
       .on('mousemove', (event) => moveTooltip(event as MouseEvent))
       .on('mouseleave', hideTooltip)
 
-    nodeEnter
-      .append('rect')
-      .attr('x', d => -d.width / 2)
-      .attr('y', d => -d.height / 2)
-      .attr('width', d => d.width)
-      .attr('height', d => d.height)
-      .attr('rx', theme.radius)
-      .attr('ry', theme.radius)
-      .attr('fill', rectFill)
-      .attr('stroke', d => (d.variant === 'root' ? 'none' : theme.nodeStroke))
-    nodeEnter
-      .append('text')
-      .attr('class', 'd3t-label')
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
-      .attr('font-family', theme.font)
-      .attr('font-size', d => (d.variant === 'root' ? theme.rootFontSize : theme.nodeFontSize))
-      .attr('font-weight', d => (d.variant === 'root' ? 'bold' : 'normal'))
-      .attr('fill', textColor)
-      .text(d => d.name)
+    if (customNodeRender) {
+      nodeEnter.each(function (d) {
+        customNodeRender!({
+          group: this,
+          data: d.data,
+          variant: d.variant,
+          side: d.side,
+          depth: d.depth,
+          width: d.width,
+          height: d.height,
+        })
+      })
+    } else {
+      nodeEnter
+        .append('rect')
+        .attr('x', d => -d.width / 2)
+        .attr('y', d => -d.height / 2)
+        .attr('width', d => d.width)
+        .attr('height', d => d.height)
+        .attr('rx', theme.radius)
+        .attr('ry', theme.radius)
+        .attr('fill', rectFill)
+        .attr('stroke', d => (d.variant === 'root' ? 'none' : theme.nodeStroke))
+      nodeEnter
+        .append('text')
+        .attr('class', 'd3t-label')
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'central')
+        .attr('font-family', theme.font)
+        .attr('font-size', d => (d.variant === 'root' ? theme.rootFontSize : theme.nodeFontSize))
+        .attr('font-weight', d => (d.variant === 'root' ? 'bold' : 'normal'))
+        .attr('fill', textColor)
+        .text(d => d.name)
+    }
 
     // +/− 徽标（仅普通节点；根节点与聚合虚拟节点不展示）
     const badge = nodeEnter
@@ -657,9 +709,11 @@ export function createBidirectionalTree(
       )
     })
 
-    // 颜色刷新（nodeColor 回调/分组调色板可能随 setData 变化）
-    nodeMerged.select<SVGRectElement>('rect').attr('fill', rectFill)
-    nodeMerged.select<SVGTextElement>('text.d3t-label').attr('fill', textColor)
+    // 颜色刷新（nodeColor 回调/分组调色板可能随 setData 变化）；自定义渲染模式下样式归用户，跳过
+    if (!customNodeRender) {
+      nodeMerged.select<SVGRectElement>('rect').attr('fill', rectFill)
+      nodeMerged.select<SVGTextElement>('text.d3t-label').attr('fill', textColor)
+    }
 
     hideTooltip()
 

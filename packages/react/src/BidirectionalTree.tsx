@@ -4,6 +4,9 @@ import { createBidirectionalTree } from '@d3-tree/core'
 import type {
   ExportImageOptions,
   LinkStyle,
+  NodeRenderer,
+  NodeSizeFn,
+  NodeTemplate,
   Side,
   TreeInstance,
   TreeNodeData,
@@ -20,6 +23,9 @@ export interface BidirectionalTreeProps {
   colorByGroup?: boolean
   /** 点击节点本体是否触发折叠切换；选取/编辑模式可置 false */
   toggleOnNodeClick?: boolean
+  nodeSize?: NodeSizeFn
+  nodeRenderer?: NodeRenderer
+  nodeTemplate?: NodeTemplate
   nodeColor?: (node: TreeNodeData) => string | undefined
   tooltipFormatter?: (node: TreeNodeData) => string
   loadChildren?: (parent: TreeNodeData) => Promise<TreeNodeData[]>
@@ -71,6 +77,9 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       visibleChildrenLimit,
       linkStyle,
       colorByGroup,
+      nodeSize,
+      nodeRenderer,
+      nodeTemplate,
       nodeColor,
       tooltipFormatter,
       loadChildren,
@@ -86,6 +95,9 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
         visibleChildrenLimit,
         linkStyle,
         colorByGroup,
+        nodeSize,
+        nodeRenderer,
+        nodeTemplate,
         nodeColor,
         tooltip: tooltipFormatter ? { formatter: tooltipFormatter } : undefined,
         loadChildren,
@@ -110,6 +122,9 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       visibleChildrenLimit,
       linkStyle,
       colorByGroup,
+      nodeSize,
+      nodeRenderer,
+      nodeTemplate,
       nodeColor,
       tooltipFormatter,
       loadChildren,

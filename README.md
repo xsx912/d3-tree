@@ -149,6 +149,31 @@ interface TreeNodeData {
 
 默认视觉对齐企业图谱参考稿：根节点 `#1E6EFF` 蓝底白字加大、普通节点白底 `#DCDFE6` 描边、连线 `#C0C4CC` 直角折线、`+/−` 徽标与"展开 (N)"聚合节点。渲染元素均携带稳定类名（`d3t-node--root|node|aggregate`、`d3t-side--left|right`、`d3t-group--<group>`、`d3t-hit`、`d3t-dimmed` 等），可直接用 CSS 覆盖样式。
 
+### 节点内容完全自定义
+
+需要图标、头像、多行、富内容时，三个 options 完全接管节点（优先级 `nodeRenderer` > `nodeTemplate` > 默认渲染；`+/−` 徽标、折叠动画、连线、tooltip、搜索、导出在自定义模式下全部继续工作）：
+
+```ts
+// 1) 几何：nodeSize 决定宽高（布局/连线/包围盒随之适配）
+nodeSize: (data, variant) =>
+  variant === 'root' ? { width: 236, height: 64 } : { width: 176, height: 52 },
+
+// 2) SVG 自定义渲染（导出 PNG/SVG 无损）——demo 见 /custom.html "SVG 图标"模式
+nodeRenderer: ({ group, data, width, height, side, depth }) => {
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+  rect.setAttribute('x', `${-width / 2}`) // …任意 SVG 内容
+  group.appendChild(rect)
+},
+
+// 3) HTML 模板（渲染进 foreignObject，图标字体/图片/富文本最便捷；导出 PNG 需模板内联样式）
+nodeTemplate: data => `
+  <div style="display:flex;...">
+    <img src="logo.png" width="20"/> <b>${data.name}</b>
+  </div>`,
+```
+
+Vue/React 组件以同名 props 透传（`node-size` / `node-renderer` / `node-template`）。
+
 ## 工程结构与工单
 
 pnpm monorepo（`packages/core|vue|react` + `apps/demo`）。需求规格与实施工单见 [`.scratch/bidirectional-tree/`](.scratch/bidirectional-tree/)（spec + 9 张 tracer-bullet 工单，`issues/` 目录含验收清单）。
