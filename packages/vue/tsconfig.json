@@ -1,8 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "jsx": "preserve",
-    "types": ["vite/client"]
+    "jsx": "preserve"
   },
   "include": ["src", "tsup.config.ts"]
 }
