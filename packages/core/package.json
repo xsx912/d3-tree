@@ -1,6 +1,6 @@
 {
   "name": "@d3-tree/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "框架无关的 d3 v7 双向树图谱核心（根居中、左右展开）",
   "keywords": [
     "d3",

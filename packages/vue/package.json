@@ -1,6 +1,6 @@
 {
   "name": "@d3-tree/vue",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "@d3-tree/core 的 Vue 3 组件封装",
   "keywords": [
     "d3",
