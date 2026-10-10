@@ -1,5 +1,5 @@
 import { createBidirectionalTree } from '@d3-tree/core'
-import type { TreeNodeData, TreeInstance } from '@d3-tree/core'
+import type { TreeNodeData, TreeInstance, TreeOptions } from '@d3-tree/core'
 import { industryData } from '../../data'
 import type { DemoItem } from '../types'
 
@@ -13,7 +13,7 @@ export const linkStyle: DemoItem = {
   setup({ canvas, overlay, setHint }) {
     let styleIdx = 0
     const groupColors = new Map<string, string>()
-    const options = {
+    const options: TreeOptions = {
       data: industryData,
       linkStyle: STYLES[0],
       linkColor: (l: { target: { data: TreeNodeData } }): string =>
@@ -30,13 +30,13 @@ export const linkStyle: DemoItem = {
       tree.destroy()
       tree = createBidirectionalTree(canvas, options)
       tree.zoomToFit()
-      setHint(`当前连线：${NAMES[STYLES[styleIdx]]}（颜色随分组）`)
+      setHint(`当前连线：${NAMES[STYLES[styleIdx]!]}（颜色随分组）`)
     }
     btn.textContent = `连线：${NAMES[STYLES[0]]}`
     btn.onclick = () => {
       styleIdx = (styleIdx + 1) % STYLES.length
       options.linkStyle = STYLES[styleIdx]
-      btn.textContent = `连线：${NAMES[STYLES[styleIdx]]}`
+      btn.textContent = `连线：${NAMES[STYLES[styleIdx]!]}`
       apply()
     }
     overlay.appendChild(btn)

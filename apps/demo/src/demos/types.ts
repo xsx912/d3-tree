@@ -18,13 +18,20 @@ export interface DemoItem {
   setup(ctx: DemoContext): () => void
 }
 
-export interface DemoEntry {
-  item: DemoItem
-  /** 该示例文件的真实源码（vite ?raw 导入），展示用 */
-  source: string
+/** 源码面板的技术栈 */
+export type DemoStack = 'html' | 'vue' | 'react'
+
+/**
+ * 每个示例三种技术栈的完整可运行源码（展示/复制用，与画布功能一一对应）：
+ * html 为整页文档、vue 为 SFC、react 为组件文件。
+ */
+export interface DemoSources {
+  html: string
+  vue: string
+  react: string
 }
 
 export interface DemoCategory {
   label: string
-  entries: DemoEntry[]
+  entries: DemoItem[]
 }

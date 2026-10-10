@@ -1,8 +1,8 @@
 import './center.css'
 import dataSrc from '../data.ts?raw'
-import { allEntries, categories } from './registry'
-import type { DemoEntry } from './types'
-import { wrapperSnippets } from './wrapper-snippets'
+import { allItems, categories } from './registry'
+import { sources } from './sources'
+import type { DemoItem, DemoStack } from './types'
 
 const sidebar = document.querySelector<HTMLDivElement>('#sidebar')!
 const canvas = document.querySelector<HTMLDivElement>('#canvas')!
@@ -16,12 +16,12 @@ const panelToggle = document.querySelector<HTMLButtonElement>('#panel-toggle')!
 const fileTabs = document.querySelector<HTMLDivElement>('#file-tabs')!
 
 let cleanup: (() => void) | null = null
-let currentEntry: DemoEntry | null = null
+let currentItem: DemoItem | null = null
 /** 技术栈（面板头部切换）与当前查看的文件（代码块上方切换） */
-let stack: 'html' | 'vue' | 'react' = 'html'
+let stack: DemoStack = 'html'
 let showData = false
 
-const MAIN_FILE: Record<'html' | 'vue' | 'react', string> = {
+const MAIN_FILE: Record<DemoStack, string> = {
   html: 'BidirectionalTree.html',
   vue: 'BidirectionalTree.vue',
   react: 'BidirectionalTree.tsx',
@@ -53,26 +53,17 @@ function renderFileTabs(): void {
   fileTabs.replaceChildren(main, data)
 }
 
-/** 按当前技术栈与文件填充源码；data.ts 即示例引入数据的实际值 */
+/** 按当前技术栈与文件填充源码：主文件与画布功能一一对应；data.ts 即示例引入数据的实际值 */
 function renderCode(): void {
-  if (!currentEntry) return
-  if (showData) {
-    panelCode.textContent = dataSrc
-    return
-  }
-  if (stack === 'html') {
-    panelCode.textContent = currentEntry.source
-  } else {
-    panelCode.textContent =
-      wrapperSnippets[currentEntry.item.id]?.[stack] ??
-      `<!-- ${currentEntry.item.title}：见 ${MAIN_FILE.html} tab 源码，封装以同名 props 透传 -->`
-  }
+  if (!currentItem) return
+  panelCode.textContent = showData ? dataSrc : (sources[currentItem.id]?.[stack] ?? '')
   panelCode.parentElement!.scrollTop = 0
 }
 
 /** 切换示例：清理上一个 → 清空画布/浮层 → 挂载 → 填充说明与源码 */
 function select(id: string, pushHash = true): void {
-  const entry = allEntries.find(e => e.item.id === id) ?? allEntries[0]
+  const item = allItems.find(i => i.id === id) ?? allItems[0]
+  if (!item) return
   cleanup?.()
   cleanup = null
   canvas.innerHTML = ''
@@ -80,31 +71,31 @@ function select(id: string, pushHash = true): void {
   overlay.hidden = true
   setHint('')
 
-  cleanup = entry.item.setup({ canvas, overlay, setHint })
+  cleanup = item.setup({ canvas, overlay, setHint })
   if (overlay.childElementCount > 0) overlay.hidden = false
 
-  panelTitle.textContent = entry.item.title
-  panelDesc.textContent = entry.item.desc
-  currentEntry = entry
+  panelTitle.textContent = item.title
+  panelDesc.textContent = item.desc
+  currentItem = item
   renderCode()
 
   for (const btn of sidebar.querySelectorAll<HTMLButtonElement>('button[data-id]')) {
-    btn.classList.toggle('active', btn.dataset.id === entry.item.id)
+    btn.classList.toggle('active', btn.dataset.id === item.id)
   }
-  if (pushHash && location.hash !== `#${entry.item.id}`) {
-    history.replaceState(null, '', `#${entry.item.id}`)
+  if (pushHash && location.hash !== `#${item.id}`) {
+    history.replaceState(null, '', `#${item.id}`)
   }
 }
 
 // ---- 左侧目录 ----
-for (const category of categories) {
+  for (const category of categories) {
   const group = document.createElement('div')
   group.className = 'cat'
   const label = document.createElement('div')
   label.className = 'cat-label'
   label.textContent = category.label
   group.appendChild(label)
-  for (const { item } of category.entries) {
+  for (const item of category.entries) {
     const btn = document.createElement('button')
     btn.dataset.id = item.id
     btn.textContent = item.title
@@ -172,8 +163,8 @@ document.querySelector<HTMLButtonElement>('#panel-copy')!.onclick = async () => 
 
 // ---- hash 深链 ----
 const initial = location.hash.slice(1)
-select(initial && allEntries.some(e => e.item.id === initial) ? initial : 'horizontal', false)
+select(initial && allItems.some(i => i.id === initial) ? initial : 'horizontal', false)
 window.addEventListener('hashchange', () => {
   const id = location.hash.slice(1)
-  if (id && allEntries.some(e => e.item.id === id)) select(id, false)
+  if (id && allItems.some(i => i.id === id)) select(id, false)
 })

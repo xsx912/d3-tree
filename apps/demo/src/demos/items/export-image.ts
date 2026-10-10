@@ -7,7 +7,7 @@ export const exportImage: DemoItem = {
   title: '导出图片',
   desc: 'exportImage 把当前可见图谱导出为文件：format 选 svg（矢量）或 png（scale 控制倍率，默认 2x）。导出内容包含主题与自定义节点。',
   setup({ canvas, overlay, setHint }) {
-    const tree = createBidirectionalTree(canvas, { data, colorByGroup: true })
+    const tree = createBidirectionalTree(canvas, { data: industryData, colorByGroup: true })
     tree.zoomToFit()
 
     const svgBtn = document.createElement('button')
