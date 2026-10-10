@@ -73,10 +73,20 @@ export interface NodeRenderContext {
   height: number
 }
 
-/** SVG 自定义渲染器（优先于 nodeTemplate 与默认渲染；导出 PNG/SVG 无损） */
+/**
+ * SVG 自定义渲染器（优先于 nodeTemplate 与默认渲染；导出 PNG/SVG 无损）。
+ * 内容中标记 data-d3t-toggle 属性的元素点击时切换该节点折叠/展开
+ * （同内置徽标语义：阻断冒泡、不触发选中回调、不受 toggleOnNodeClick 约束），
+ * 供调用端自行决定自定义节点的哪块区域可折叠展开。
+ */
 export type NodeRenderer = (context: NodeRenderContext) => void
 
-/** HTML 模板：返回 HTML 字符串或元素，渲染进节点 foreignObject（导出 PNG 需内联样式） */
+/**
+ * HTML 模板：返回 HTML 字符串或元素，渲染进节点 foreignObject（导出 PNG 需内联样式）。
+ * 内容中标记 data-d3t-toggle 属性的元素点击时切换该节点折叠/展开
+ * （同内置徽标语义：阻断冒泡、不触发选中回调、不受 toggleOnNodeClick 约束），
+ * 供调用端自行决定自定义节点的哪块区域可折叠展开。
+ */
 export type NodeTemplate = (data: TreeNodeData, variant: NodeVariant) => string | HTMLElement
 
 export interface TooltipOptions {
@@ -154,7 +164,11 @@ export interface TreeOptions {
   onNodeToggle?: (node: TreeNodeData, collapsed: boolean) => void
   /** 任何非聚合节点被点击时广播（含根节点）；供选取/编辑流程使用 */
   onNodeSelect?: (node: TreeNodeData) => void
-  /** 点击节点本体是否触发折叠切换，默认 true；置 false 后点击仅触发回调（编辑选取模式） */
+  /**
+   * 点击节点本体是否触发折叠切换，默认 true；置 false 后点击仅触发回调（编辑选取模式）。
+   * 置 false 后仍可折叠的途径：内置 +/− 徽标、聚合节点，以及自定义节点内容中
+   * 标记 data-d3t-toggle 的子元素（见 NodeTemplate / NodeRenderer）。
+   */
   toggleOnNodeClick?: boolean
   /** 分组集合变化时回调（初始渲染与 setData 后触发），供图例 UI 构建使用 */
   onGroupsChange?: (groups: Array<{ name: string; color: string }>) => void

@@ -679,8 +679,22 @@ export function createBidirectionalTree(
     )
   }
 
-  /** 节点激活的统一入口（鼠标点击与键盘 Enter/Space 共用） */
-  function activateNode(d: LayoutNode): void {
+  /**
+   * 节点激活的统一入口（鼠标点击与键盘 Enter/Space 共用）。
+   * 自定义节点内容中标记 data-d3t-toggle 的子元素是独立"折叠/展开"按钮：
+   * 点击它只切换折叠态（stopPropagation 语义，同内置徽标），不触发选中回调，
+   * 且不受 toggleOnNodeClick 约束——配合 toggleOnNodeClick:false 即可实现
+   * "仅调用端指定的区域可折叠/展开"。
+   */
+  function activateNode(event: Event, d: LayoutNode): void {
+    if (d.variant !== 'aggregate') {
+      const target = event.target instanceof Element ? event.target : null
+      if (target?.closest('[data-d3t-toggle]')) {
+        event.stopPropagation()
+        toggleById(d.data.id)
+        return
+      }
+    }
     if (d.variant === 'aggregate') {
       revealByParent(d.parentId)
       return
@@ -788,11 +802,11 @@ export function createBidirectionalTree(
       .attr('role', d => (d.variant === 'aggregate' ? 'button' : 'treeitem'))
       .attr('aria-label', d => d.name)
       .attr('tabindex', 0)
-      .on('click', (_event, d) => activateNode(d))
+      .on('click', (event, d) => activateNode(event, d))
       .on('keydown', (event, d) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
-          activateNode(d)
+          activateNode(event, d)
         }
       })
       .on('mouseenter', (event, d) => showTooltip(event as MouseEvent, d))
