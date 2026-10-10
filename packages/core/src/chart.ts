@@ -143,10 +143,10 @@ export function createBidirectionalTree(
   const duration = options.duration ?? (prefersReducedMotion ? 0 : 250)
   /** 内置文案（聚合节点/徽标提示），缺省中文 */
   const texts = options.texts
-  /** 展开淡入/收起淡出的目标透明度：缺省 1 即纯位移（不引入 opacity）；非法值回退 1 */
+  /** 展开淡入/收起淡出的目标透明度：缺省 0.25（淡入淡出）；非法值回退 0.25；传 1 关闭淡入淡出（纯位移） */
   const fadeOption = options.fadeOpacity
   const fade =
-    fadeOption == null || !Number.isFinite(fadeOption) ? 1 : Math.min(1, Math.max(0, fadeOption))
+    fadeOption == null || !Number.isFinite(fadeOption) ? 0.25 : Math.min(1, Math.max(0, fadeOption))
   const rowHeight = options.rowHeight ?? 48
   const columnGap = options.columnGap ?? 48
   const linkStyle: LinkStyle = options.linkStyle ?? 'orthogonal'

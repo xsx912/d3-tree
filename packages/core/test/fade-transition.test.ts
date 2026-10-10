@@ -142,6 +142,16 @@ describe('fadeOpacity 展开淡入/收起淡出（过渡过程）', () => {
     expect(linkOpacities(container).filter(op => op < 1), '新连线淡入完毕').toHaveLength(0)
   })
 
+  it('未配置 fadeOpacity 时默认 0.25：进入元素以 0.25 起步淡入', () => {
+    const { container, tree } = mount() // 不传 fadeOpacity，锁定新默认值
+    tree.toggle('a')
+    vi.advanceTimersByTime(400)
+    tree.toggle('a')
+    expect(nodeOpacity(container, 'a1'), 'enter 瞬间透明度应为默认淡入起点 0.25').toBeCloseTo(0.25)
+    vi.advanceTimersByTime(400)
+    expect(nodeOpacity(container, 'a1'), '过渡完成后恢复不透明').toBe(1)
+  })
+
   it('fadeOpacity 超出 [0,1] 时钳制：负值按 0、超过 1 视为关闭淡入淡出', () => {
     const low = mount({ fadeOpacity: -0.5 })
     low.tree.toggle('a')
