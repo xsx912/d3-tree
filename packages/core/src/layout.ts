@@ -29,6 +29,8 @@ export interface AggregateConfig {
   limit: number
   /** 每父节点已额外释放的数量（超出 limit 的部分） */
   revealed: Map<string, number>
+  /** “展开 (N)”基础文案注入（国际化）；缺省 `展开 (N)`，方向箭头由内部追加 */
+  aggregateLabel?: (remaining: number) => string
 }
 
 export interface LayoutNode {
@@ -86,7 +88,11 @@ function buildDisplay(
 ): DisplayNode | null {
   // 分组过滤：未命中分组的节点连同其整棵子树一并隐藏（未分组节点不受影响）
   if (visibleGroups && node.group && !visibleGroups.has(node.group)) return null
-  const children = node.children ?? []
+  // 分组过滤先行：聚合的“剩余数”只统计过滤后仍应可见的子节点，避免把被过滤节点计入“展开 (N)”
+  const allChildren = node.children ?? []
+  const children = visibleGroups
+    ? allChildren.filter(c => !c.group || visibleGroups.has(c.group))
+    : allChildren
   if (!collapsedIds.has(node.id) && children.length) {
     let visible = children
     let aggregate: DisplayNode | undefined
@@ -95,14 +101,15 @@ function buildDisplay(
       visible = children.slice(0, take)
       const remaining = children.length - visible.length
       if (remaining > 0) {
+        const label = agg.aggregateLabel ? agg.aggregateLabel(remaining) : `展开 (${remaining})`
         const name =
           orientation === 'vertical'
             ? side === 'left'
-              ? `↑ 展开 (${remaining})`
-              : `展开 (${remaining}) ↓`
+              ? `↑ ${label}`
+              : `${label} ↓`
             : side === 'left'
-              ? `< 展开 (${remaining})`
-              : `展开 (${remaining}) >`
+              ? `< ${label}`
+              : `${label} >`
         aggregate = { original: { id: `__agg__${node.id}`, name } }
       }
     }

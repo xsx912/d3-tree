@@ -1,5 +1,7 @@
 export { createBidirectionalTree } from './chart'
 export { theme } from './theme'
+export type { Theme } from './theme'
+export type { LayoutNode, LayoutLink, LayoutResult } from './layout'
 export type {
   ExportImageOptions,
   LinkColor,
@@ -18,4 +20,5 @@ export type {
   TreeInstance,
   TreeNodeData,
   TreeOptions,
+  TreeTexts,
 } from './types'

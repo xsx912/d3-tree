@@ -1,3 +1,5 @@
+import type { Theme } from './theme'
+
 /** 节点在双向树中的分侧；根节点为 center */
 export type Side = 'left' | 'right'
 
@@ -76,6 +78,19 @@ export interface TooltipOptions {
   formatter?: (node: TreeNodeData) => string
 }
 
+/** 内置文案定制（缺省中文）：聚合节点与徽标悬停提示，供国际化替换 */
+export interface TreeTexts {
+  /**
+   * “展开 (N)”聚合节点的基础文案（返回不含方向箭头的文本，如 `Expand (3)`）；
+   * 方向箭头（`<` `>` `↑` `↓`）由内部按分侧与布局方向追加
+   */
+  aggregateLabel?: (remaining: number) => string
+  /** 徽标悬停提示：节点处于收起态（参数为后代节点总数） */
+  badgeExpandTitle?: (descendantCount: number) => string
+  /** 徽标悬停提示：节点处于展开态 */
+  badgeCollapseTitle?: (descendantCount: number) => string
+}
+
 export interface TreeOptions {
   data: TreeNodeData
   /** 过渡动画时长（ms），默认 250（对齐官方 collapsible-tree） */
@@ -116,6 +131,12 @@ export interface TreeOptions {
   tooltip?: TooltipOptions
   /** 异步加载子节点回调（点击“展开 (N)”时触发） */
   loadChildren?: (parent: TreeNodeData) => Promise<TreeNodeData[]>
+  /** loadChildren 拉取失败时回调（错误对象 + 触发的父节点）；缺省仅静默复位 loading 态 */
+  onLoadError?: (error: unknown, parent: TreeNodeData) => void
+  /** 主题定制：浅合并到内置主题，可覆盖背景、节点色、连线色等任意字段 */
+  theme?: Partial<Theme>
+  /** 内置文案定制（聚合节点/徽标提示），用于国际化；缺省中文 */
+  texts?: TreeTexts
   onNodeClick?: (node: TreeNodeData) => void
   onNodeToggle?: (node: TreeNodeData, collapsed: boolean) => void
   /** 任何非聚合节点被点击时广播（含根节点）；供选取/编辑流程使用 */

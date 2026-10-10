@@ -5,6 +5,7 @@ import { computeLayout, degenerateLinkPath, linkPath } from './layout'
 import type { LayoutLink, LayoutNode, LayoutResult } from './layout'
 import { createCanvasMeasurer } from './measure'
 import { theme } from './theme'
+import type { Theme } from './theme'
 import type {
   ExportImageOptions,
   LinkEndpoint,
@@ -25,15 +26,20 @@ interface Position {
   y: number
 }
 
-/** 注入容器的高亮/淡化样式（导出时会内联进克隆 SVG） */
-const SVG_CSS = `
-.d3t-svg .d3t-dimmed { opacity: 0.2; }
-.d3t-svg .d3t-hit rect { stroke: #1E6EFF; stroke-width: 2; }
-.d3t-svg .d3t-hit text.d3t-label { fill: #1E6EFF; font-weight: 600; }
+/** 注入容器的高亮/淡化样式（导出时会内联进克隆 SVG）；颜色取自合并后的实例主题 */
+function buildSvgCss(t: Theme): string {
+  return `
+.d3t-svg .d3t-dimmed { opacity: ${t.dimmedOpacity}; }
+.d3t-svg .d3t-hit rect { stroke: ${t.hitStroke}; stroke-width: 2; }
+.d3t-svg .d3t-hit text.d3t-label { fill: ${t.hitStroke}; font-weight: 600; }
 .d3t-svg .d3t-hit-ancestor rect { stroke-dasharray: 4 2; }
 .d3t-svg .d3t-loading rect { stroke-dasharray: 3 2; animation: d3t-blink 1s infinite; }
+.d3t-svg .d3t-node:focus { outline: none; }
+.d3t-svg .d3t-node:focus-visible rect,
+.d3t-svg .d3t-node:focus-visible foreignObject { stroke: ${t.hitStroke}; stroke-width: 2; }
 @keyframes d3t-blink { 50% { opacity: 0.55; } }
 `
+}
 
 /** 深度优先查找指定 id 的数据节点 */
 function findDataById(root: TreeNodeData, id: string): TreeNodeData | undefined {
@@ -43,6 +49,23 @@ function findDataById(root: TreeNodeData, id: string): TreeNodeData | undefined 
     if (hit) return hit
   }
   return undefined
+}
+
+/** 重复 id 会使 d3 join key 冲突（同 id 节点只渲染一个），开发期给出告警 */
+function warnDuplicateIds(root: TreeNodeData): void {
+  const seen = new Set<string>()
+  const dupes = new Set<string>()
+  const walk = (node: TreeNodeData): void => {
+    if (seen.has(node.id)) dupes.add(node.id)
+    seen.add(node.id)
+    for (const child of node.children ?? []) walk(child)
+  }
+  walk(root)
+  if (dupes.size) {
+    console.warn(
+      `[d3-tree] 数据中存在重复节点 id：${[...dupes].map(id => `"${id}"`).join('、')}；同 id 节点只会渲染一个`,
+    )
+  }
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
@@ -110,7 +133,16 @@ export function createBidirectionalTree(
   container: HTMLElement,
   options: TreeOptions,
 ): TreeInstance {
-  const duration = options.duration ?? 250
+  /** 实例主题：内置主题浅合并用户覆盖项 */
+  const t: Theme = { ...theme, ...options.theme }
+  /** 尊重系统"减少动态效果"偏好：未显式配置 duration 时直接关闭动画 */
+  const prefersReducedMotion =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const duration = options.duration ?? (prefersReducedMotion ? 0 : 250)
+  /** 内置文案（聚合节点/徽标提示），缺省中文 */
+  const texts = options.texts
   /** 展开淡入/收起淡出的目标透明度：缺省 1 即纯位移（不引入 opacity）；非法值回退 1 */
   const fadeOption = options.fadeOpacity
   const fade =
@@ -120,13 +152,13 @@ export function createBidirectionalTree(
   const linkStyle: LinkStyle = options.linkStyle ?? 'orthogonal'
   const orientation: Orientation = options.orientation ?? 'horizontal'
   const visibleChildrenLimit = options.visibleChildrenLimit ?? 5
-  const measureText: TextMeasurer = options.measureText ?? createCanvasMeasurer()
+  const measureText: TextMeasurer = options.measureText ?? createCanvasMeasurer(t)
   /** 节点几何来源：默认文字度量宽 + 内置高度；nodeSize 完全接管 */
   const sizeOf: NodeSizeFn =
     options.nodeSize ??
     ((data, variant) => ({
       width: measureText(data.name, variant),
-      height: variant === 'root' ? theme.rootHeight : theme.nodeHeight,
+      height: variant === 'root' ? t.rootHeight : t.nodeHeight,
     }))
   /** 自定义渲染模式：用户完全接管节点内容时，core 不再刷新默认填充/文字色 */
   const customNodeRender: NodeRenderer | undefined =
@@ -141,7 +173,7 @@ export function createBidirectionalTree(
     .style('width', '100%')
     .style('height', '100%')
     .style('display', 'block')
-    .style('background', '#FFFFFF')
+    .style('background', t.background)
     .attr('cursor', 'grab')
   // 缩放层（承载 zoom 变换）与内容层（承载居中平移）分离，避免变换互相覆盖
   const gZoom = svg.append('g').attr('class', 'd3t-zoom')
@@ -168,14 +200,14 @@ export function createBidirectionalTree(
     position: 'absolute',
     zIndex: '1000',
     pointerEvents: 'none',
-    background: '#FFFFFF',
-    border: '1px solid ' + theme.nodeStroke,
+    background: t.background,
+    border: '1px solid ' + t.nodeStroke,
     borderRadius: '4px',
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)',
     padding: '8px 12px',
     fontSize: '12px',
-    color: theme.nodeText,
-    fontFamily: theme.font,
+    color: t.nodeText,
+    fontFamily: t.font,
     lineHeight: '1.7',
     maxWidth: '280px',
   } satisfies Partial<CSSStyleDeclaration>)
@@ -223,7 +255,7 @@ export function createBidirectionalTree(
 
   // ---- 高亮/淡化样式注入 ----
   const styleEl = document.createElement('style')
-  styleEl.textContent = SVG_CSS
+  styleEl.textContent = buildSvgCss(t)
   container.appendChild(styleEl)
 
   /** 最近一次渲染的布局（搜索定位/导出取包围盒用；render() 首帧赋值） */
@@ -356,11 +388,11 @@ export function createBidirectionalTree(
       .attr('height', h)
       .attr('viewBox', `${originX} ${originY} ${w} ${h}`)
       .attr('cursor', null)
-      .style('background', '#FFFFFF')
+      .style('background', t.background)
     c.select('g.d3t-zoom').attr('transform', null) // 忽略当前缩放，导出完整内容
     clone.querySelectorAll('[cursor]').forEach(el => el.removeAttribute('cursor'))
     const style = document.createElementNS('http://www.w3.org/2000/svg', 'style')
-    style.textContent = SVG_CSS
+    style.textContent = buildSvgCss(t)
     clone.insertBefore(style, clone.firstChild)
     return { element: clone, width: w, height: h }
   }
@@ -394,7 +426,7 @@ export function createBidirectionalTree(
       canvas.height = Math.ceil(height * scale)
       const ctx = canvas.getContext('2d')
       if (!ctx) throw new Error('Canvas 2D 上下文不可用')
-      ctx.fillStyle = '#FFFFFF'
+      ctx.fillStyle = t.background
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
       return canvas.toDataURL('image/png')
@@ -411,7 +443,10 @@ export function createBidirectionalTree(
     const svgString = new XMLSerializer().serializeToString(element)
     if (format === 'svg') {
       const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' })
-      triggerDownload(URL.createObjectURL(blob), `${filename}.svg`)
+      const url = URL.createObjectURL(blob)
+      triggerDownload(url, `${filename}.svg`)
+      // 延迟回收 blob URL：立即 revoke 在个别浏览器会导致下载中断
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
       return
     }
     const dataUrl = await svgToPngDataUrl(svgString, width, height, scale)
@@ -419,6 +454,8 @@ export function createBidirectionalTree(
   }
 
   let currentData: TreeNodeData = options.data
+  /** destroy 后置位：在途的 loadChildren 完成时不再触碰已销毁的 DOM */
+  let destroyed = false
   let collapsedIds = seedCollapsed(currentData)
   /** 聚合释放状态：父 id → 已额外释放的子节点数（超出 visibleChildrenLimit 部分） */
   let revealed = new Map<string, number>()
@@ -434,7 +471,7 @@ export function createBidirectionalTree(
     if (!options.colorByGroup) return colors
     const walk = (node: TreeNodeData): void => {
       if (node.group && !colors.has(node.group)) {
-        colors.set(node.group, theme.groupPalette[colors.size % theme.groupPalette.length]!)
+        colors.set(node.group, t.groupPalette[colors.size % t.groupPalette.length]!)
       }
       for (const child of node.children ?? []) walk(child)
     }
@@ -443,13 +480,13 @@ export function createBidirectionalTree(
   }
 
   function rectFill(d: LayoutNode): string {
-    if (d.variant === 'root') return theme.rootFill
+    if (d.variant === 'root') return t.rootFill
     const custom = options.nodeColor?.(d.data)
     if (custom) return custom
     if (options.colorByGroup && d.data.group) {
-      return groupColors.get(d.data.group) ?? theme.nodeFill
+      return groupColors.get(d.data.group) ?? t.nodeFill
     }
-    return theme.nodeFill
+    return t.nodeFill
   }
 
   /** 分组着色或自定义着色时使用白字保证对比度 */
@@ -460,13 +497,20 @@ export function createBidirectionalTree(
   }
 
   function textColor(d: LayoutNode): string {
-    if (d.variant === 'root') return theme.rootText
-    if (d.variant === 'aggregate') return theme.aggregateText
-    return isColored(d) ? '#FFFFFF' : theme.nodeText
+    if (d.variant === 'root') return t.rootText
+    if (d.variant === 'aggregate') return t.aggregateText
+    return isColored(d) ? '#FFFFFF' : t.nodeText
   }
 
+  /** 中文等非类名字符替换为 '-'；替换后与原名不一致时追加短哈希，避免 "a b" 与 "a-b" 折叠成同一类名 */
   function sanitizeGroupClass(group: string): string {
-    return group.replace(/[^a-zA-Z0-9_-]+/g, '-')
+    const safe = group.replace(/[^a-zA-Z0-9_-]+/g, '-')
+    if (safe === group) return safe
+    let hash = 5381
+    for (let i = 0; i < group.length; i++) {
+      hash = ((hash << 5) + hash + group.charCodeAt(i)) >>> 0
+    }
+    return `${safe}-${hash.toString(36)}`
   }
 
   function nodeClass(d: LayoutNode): string {
@@ -501,20 +545,20 @@ export function createBidirectionalTree(
   const linkColorOf = (l: LayoutLink): string =>
     typeof options.linkColor === 'function'
       ? options.linkColor(toLinkCtx(l))
-      : (options.linkColor ?? theme.link)
+      : (options.linkColor ?? t.link)
 
-  const linkWidthOf = (): number => options.linkWidth ?? theme.linkWidth
+  const linkWidthOf = (): number => options.linkWidth ?? t.linkWidth
 
   function badgeCenterX(d: LayoutNode): number {
     if (orientation === 'vertical') return 0
     const dir = d.side === 'left' ? -1 : 1
-    return dir * (d.width / 2 + theme.badgeRadius + 3)
+    return dir * (d.width / 2 + t.badgeRadius + 3)
   }
 
   function badgeCenterY(d: LayoutNode): number {
     if (orientation !== 'vertical') return 0
     const dir = d.side === 'left' ? -1 : 1
-    return dir * (d.height / 2 + theme.badgeRadius + 3)
+    return dir * (d.height / 2 + t.badgeRadius + 3)
   }
 
   /** 官方 collapsible-tree 模式：翻转折叠态后以被点击节点为动画源重绘 */
@@ -545,6 +589,7 @@ export function createBidirectionalTree(
       setAggLoading(aggKey, true)
       loader(parent)
         .then(fetched => {
+          if (destroyed) return
           const existing = new Set((parent.children ?? []).map(c => c.id))
           parent.children = [...(parent.children ?? [])]
           for (const child of fetched) {
@@ -558,7 +603,11 @@ export function createBidirectionalTree(
           setAggLoading(aggKey, false)
           render(parentId)
         })
-        .catch(() => setAggLoading(aggKey, false))
+        .catch((error: unknown) => {
+          if (destroyed) return
+          setAggLoading(aggKey, false)
+          options.onLoadError?.(error, parent)
+        })
       return
     }
     revealed.set(parentId, (revealed.get(parentId) ?? 0) + visibleChildrenLimit)
@@ -570,15 +619,33 @@ export function createBidirectionalTree(
     for (const child of node.children ?? []) walkAll(child, fn)
   }
 
+  /** 递归清理被移除子树残留的折叠/释放状态，避免同 id 复用时翻出幽灵折叠态 */
+  function pruneState(node: TreeNodeData): void {
+    collapsedIds.delete(node.id)
+    revealed.delete(node.id)
+    for (const c of node.children ?? []) pruneState(c)
+  }
+
   /** 以当前视图状态（折叠/聚合/分组过滤）计算布局 */
   function currentLayout(): LayoutResult {
     return computeLayout(
       currentData,
       { rowHeight, columnGap, nodeSize: sizeOf, orientation },
       collapsedIds,
-      { limit: visibleChildrenLimit, revealed },
+      { limit: visibleChildrenLimit, revealed, aggregateLabel: texts?.aggregateLabel },
       visibleGroups,
     )
+  }
+
+  /** 节点激活的统一入口（鼠标点击与键盘 Enter/Space 共用） */
+  function activateNode(d: LayoutNode): void {
+    if (d.variant === 'aggregate') {
+      revealByParent(d.parentId)
+      return
+    }
+    options.onNodeClick?.(d.data)
+    options.onNodeSelect?.(d.data)
+    if (d.variant !== 'root' && options.toggleOnNodeClick !== false) toggleById(d.data.id)
   }
 
   function render(sourceKey?: string): void {
@@ -676,14 +743,15 @@ export function createBidirectionalTree(
       .attr('transform', () => `translate(${start.x},${start.y})`)
       .attr('opacity', fading ? fade : null)
       .attr('cursor', d => (d.variant === 'root' ? 'default' : 'pointer'))
-      .on('click', (_event, d) => {
-        if (d.variant === 'aggregate') {
-          revealByParent(d.parentId)
-          return
+      .attr('role', d => (d.variant === 'aggregate' ? 'button' : 'treeitem'))
+      .attr('aria-label', d => d.name)
+      .attr('tabindex', 0)
+      .on('click', (_event, d) => activateNode(d))
+      .on('keydown', (event, d) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          activateNode(d)
         }
-        options.onNodeClick?.(d.data)
-        options.onNodeSelect?.(d.data)
-        if (d.variant !== 'root' && options.toggleOnNodeClick !== false) toggleById(d.data.id)
       })
       .on('mouseenter', (event, d) => showTooltip(event as MouseEvent, d))
       .on('mousemove', (event) => moveTooltip(event as MouseEvent))
@@ -708,28 +776,30 @@ export function createBidirectionalTree(
         .attr('y', d => -d.height / 2)
         .attr('width', d => d.width)
         .attr('height', d => d.height)
-        .attr('rx', theme.radius)
-        .attr('ry', theme.radius)
+        .attr('rx', t.radius)
+        .attr('ry', t.radius)
         .attr('fill', rectFill)
-        .attr('stroke', d => (d.variant === 'root' ? 'none' : theme.nodeStroke))
+        .attr('stroke', d => (d.variant === 'root' ? 'none' : t.nodeStroke))
       nodeEnter
         .append('text')
         .attr('class', 'd3t-label')
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'central')
-        .attr('font-family', theme.font)
-        .attr('font-size', d => (d.variant === 'root' ? theme.rootFontSize : theme.nodeFontSize))
+        .attr('font-family', t.font)
+        .attr('font-size', d => (d.variant === 'root' ? t.rootFontSize : t.nodeFontSize))
         .attr('font-weight', d => (d.variant === 'root' ? 'bold' : 'normal'))
         .attr('fill', textColor)
         .text(d => d.name)
     }
 
     // +/− 徽标（仅普通节点；根节点与聚合虚拟节点不展示）
+    // 徽标操作与节点本体键盘激活重复，标记 aria-hidden 避免屏幕阅读器/Tab 序列重复停留
     const badge = nodeEnter
       .filter(d => d.variant === 'node')
       .append('g')
       .attr('class', 'd3t-badge')
       .attr('cursor', 'pointer')
+      .attr('aria-hidden', 'true')
       .on('click', (event, d) => {
         event.stopPropagation()
         toggleById(d.data.id)
@@ -737,11 +807,11 @@ export function createBidirectionalTree(
     badge
       .append('circle')
       .attr('class', 'd3t-badge-circle')
-      .attr('r', theme.badgeRadius)
+      .attr('r', t.badgeRadius)
       .attr('cx', badgeCenterX)
       .attr('cy', badgeCenterY)
-      .attr('fill', theme.badgeFill)
-      .attr('stroke', theme.badgeStroke)
+      .attr('fill', t.badgeFill)
+      .attr('stroke', t.badgeStroke)
       .attr('stroke-width', 1)
     badge
       .append('text')
@@ -752,7 +822,7 @@ export function createBidirectionalTree(
       .attr('y', badgeCenterY)
       .attr('font-size', 12)
       .attr('font-weight', 'bold')
-      .attr('fill', theme.badgeText)
+      .attr('fill', t.badgeText)
     badge.append('title')
 
     const nodeMerged = nodeEnter.merge(node)
@@ -767,7 +837,10 @@ export function createBidirectionalTree(
       nodeMerged.attr('transform', d => `translate(${d.x},${d.y})`)
     }
 
-    // 徽标状态刷新：可见性、+/− 符号、悬停提示（后代数）
+    // 徽标状态刷新：可见性、+/− 符号、悬停提示（后代数）；节点展开态同步到 aria-expanded
+    nodeMerged.attr('aria-expanded', d =>
+      d.data.children?.length ? String(!collapsedIds.has(d.key)) : null,
+    )
     nodeMerged.select<SVGGElement>('g.d3t-badge').each(function (d) {
       const g = select(this)
       const hasChildren = !!d.data.children?.length
@@ -775,17 +848,31 @@ export function createBidirectionalTree(
       g.select<SVGTextElement>('text.d3t-badge-symbol').text(collapsedIds.has(d.key) ? '+' : '−')
       const n = countDescendants(d.data)
       g.select('title').text(
-        collapsedIds.has(d.key) ? `展开（含 ${n} 个后代节点）` : `收起（含 ${n} 个后代节点）`,
+        collapsedIds.has(d.key)
+          ? (texts?.badgeExpandTitle?.(n) ?? `展开（含 ${n} 个后代节点）`)
+          : (texts?.badgeCollapseTitle?.(n) ?? `收起（含 ${n} 个后代节点）`),
       )
     })
 
-    // 颜色刷新（nodeColor 回调/分组调色板可能随 setData 变化）；自定义渲染模式下样式归用户，跳过
+    // 默认渲染模式：刷新几何与文字（分组过滤/聚合释放会改变同名 key 的尺寸与文案，如“展开 (N)”计数）
     if (!customNodeRender) {
-      nodeMerged.select<SVGRectElement>('rect').attr('fill', rectFill)
-      nodeMerged.select<SVGTextElement>('text.d3t-label').attr('fill', textColor)
+      nodeMerged
+        .select<SVGRectElement>('rect')
+        .attr('x', d => -d.width / 2)
+        .attr('y', d => -d.height / 2)
+        .attr('width', d => d.width)
+        .attr('height', d => d.height)
+        .attr('fill', rectFill)
+      nodeMerged
+        .select<SVGTextElement>('text.d3t-label')
+        .attr('fill', textColor)
+        .text(d => d.name)
     }
 
     hideTooltip()
+
+    // 搜索态下重放高亮/淡化：折叠展开新进入的节点、增删后的节点也能获得正确的视觉状态
+    if (searchState) applySearchClasses(searchState)
 
     lastLayout = layout
     positions.clear()
@@ -807,12 +894,14 @@ export function createBidirectionalTree(
   }
 
   // 分组回调先于首帧触发，让监听方（图例/连线着色等）在首帧渲染前完成准备
+  warnDuplicateIds(currentData)
   groupColors = computeGroupColors(currentData)
   emitGroups()
   render()
 
   return {
     setData(data) {
+      warnDuplicateIds(data)
       const sourceKey = currentData.id
       currentData = data
       collapsedIds = seedCollapsed(data)
@@ -857,8 +946,9 @@ export function createBidirectionalTree(
       if (id === currentData.id) return false
       const parent = findParentOf(currentData, id)
       if (!parent?.children?.some(c => c.id === id)) return false
+      const removed = parent.children.find(c => c.id === id)!
       parent.children = parent.children.filter(c => c.id !== id)
-      revealed.delete(id)
+      pruneState(removed)
       render(parent.id)
       return true
     },
@@ -897,6 +987,7 @@ export function createBidirectionalTree(
       return exportImageImpl(options ?? {})
     },
     destroy() {
+      destroyed = true
       resizeObserver?.disconnect()
       svg.remove()
       tooltipEl.remove()

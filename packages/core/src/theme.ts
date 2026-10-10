@@ -1,5 +1,13 @@
-/** 视觉基线取自参考稿：白底、单一品牌蓝、克制灰阶（Element/AntD 风格） */
+/** 视觉基线取自参考稿：白底、单一品牌蓝、克制灰阶（Element/AntD 风格）。
+ *  实例可通过 options.theme 对任意字段做浅合并覆盖。 */
 export const theme = {
+  /** 画布背景（SVG 与导出图片共用） */
+  background: '#FFFFFF',
+  /** 搜索命中描边/文字色，兼作键盘焦点描边 */
+  hitStroke: '#1E6EFF',
+  /** 搜索/过滤时非命中元素的淡化透明度 */
+  dimmedOpacity: 0.2,
+
   rootFill: '#1E6EFF',
   rootText: '#FFFFFF',
   rootFontSize: 16,
