@@ -5,6 +5,8 @@ export type {
   LinkStyle,
   Side,
   TextMeasurer,
+  TooltipContext,
+  TooltipOptions,
   TreeInstance,
   TreeNodeData,
   TreeOptions,

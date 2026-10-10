@@ -28,7 +28,8 @@ function createBidirectionalTree(container: HTMLElement, options: TreeOptions): 
 | `nodeSize` | `(data, variant) => { width, height }` | 节点几何完全接管 |
 | `nodeRenderer` | `(ctx) => void` | SVG 自定义节点渲染（导出无损） |
 | `nodeTemplate` | `(data, variant) => string \| HTMLElement` | HTML 模板渲染进 foreignObject |
-| `tooltip.formatter` | `(node) => string` | tooltip HTML（默认名称 + properties 键值表，自动转义） |
+| `tooltip.formatter` | `(node, ctx) => string \| HTMLElement` | 悬浮框内容：HTML 字符串或 DOM 元素（可承载组件宿主）；默认名称 + properties 键值表（自动转义）；ctx 见 [TooltipContext](#tooltipcontext) |
+| `tooltip.className` | `string` | 追加到悬浮层的 class（内置外壳保留，覆盖内联样式需 `!important`） |
 | `loadChildren` | `(parent) => Promise<TreeNodeData[]>` | 异步拉取并入数据；触发：点击「展开 (N)」聚合，或展开 `hasChildren` 标记节点（本地已有下一级则不请求） |
 | `onLoadError` | `(error, parent) => void` | loadChildren 拉取失败回调；缺省仅静默复位 loading 态 |
 | `theme` | `Partial<Theme>` | 主题定制：浅合并到内置主题（背景/节点色/连线色/徽标/调色板等任意字段） |
@@ -129,6 +130,20 @@ ctx.group.appendChild(btn)
 注意：自定义节点内容只在节点进入时渲染一次，折叠态变化不会重跑模板；
 内置 +/− 徽标始终由图表自动绘制并随状态刷新，需要展示状态时优先使用徽标。
 
+## TooltipContext
+
+`tooltip.formatter` 收到的第二个参数（节点在当前视图中的位置与状态）：
+
+```ts
+interface TooltipContext {
+  depth: number                     // 深度（根为 0）
+  side: 'left' | 'right' | 'center'
+  collapsed: boolean                // 本地子级已折叠不显示
+}
+```
+
+字符串模式按 HTML 解析（转义由调用端负责）；返回元素则原样挂入悬浮层，可承载组件宿主。详见[悬浮框自定义](/guide/custom-tooltip)。
+
 ## LinkRenderContext
 
 `linkColor` 与 `linkPathGenerator` 收到的上下文：
@@ -150,4 +165,4 @@ interface LinkEndpoint {
 
 ## 渲染类名（CSS 定制）
 
-`d3t-node--root|node|aggregate`、`d3t-side--left|right|center`、`d3t-group--<group>`、`d3t-label`、`d3t-link`、`d3t-badge`、`d3t-hit`、`d3t-hit-ancestor`、`d3t-dimmed`、`d3t-loading`。SVG 内联属性优先级低于 CSS，可直接以规则覆盖颜色/线型。
+`d3t-node--root|node|aggregate`、`d3t-side--left|right|center`、`d3t-group--<group>`、`d3t-label`、`d3t-link`、`d3t-badge`、`d3t-hit`、`d3t-hit-ancestor`、`d3t-dimmed`、`d3t-loading`、`d3t-tooltip`（悬浮层基类）。SVG 内联属性优先级低于 CSS，可直接以规则覆盖颜色/线型。

@@ -13,6 +13,7 @@ import type {
   Side,
   TextMeasurer,
   Theme,
+  TooltipContext,
   TreeInstance,
   TreeNodeData,
   TreeOptions,
@@ -73,9 +74,10 @@ export const BidirectionalTree = defineComponent({
       default: undefined,
     },
     tooltipFormatter: {
-      type: Function as PropType<(node: TreeNodeData) => string>,
+      type: Function as PropType<(node: TreeNodeData, ctx: TooltipContext) => string | HTMLElement>,
       default: undefined,
     },
+    tooltipClassName: { type: String, default: undefined },
     loadChildren: {
       type: Function as PropType<(parent: TreeNodeData) => Promise<TreeNodeData[]>>,
       default: undefined,
@@ -119,7 +121,12 @@ export const BidirectionalTree = defineComponent({
         nodeRenderer: props.nodeRenderer ?? undefined,
         nodeTemplate: props.nodeTemplate ?? undefined,
         nodeColor: props.nodeColor ?? undefined,
-        tooltip: props.tooltipFormatter ? { formatter: props.tooltipFormatter } : undefined,
+        tooltip: props.tooltipFormatter || props.tooltipClassName
+          ? {
+              formatter: props.tooltipFormatter ?? undefined,
+              className: props.tooltipClassName ?? undefined,
+            }
+          : undefined,
         loadChildren: props.loadChildren ?? undefined,
         onLoadError: (error, parent) => emit('load-error', error, parent),
         measureText: props.measureText,
@@ -179,6 +186,7 @@ export const BidirectionalTree = defineComponent({
         props.nodeRenderer,
         props.nodeTemplate,
         props.tooltipFormatter,
+        props.tooltipClassName,
         props.loadChildren,
         props.measureText,
         props.theme,

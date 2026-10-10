@@ -22,6 +22,7 @@ export default defineConfig({
           { text: 'API 参考', link: '/guide/api' },
           { text: '节点自定义', link: '/guide/custom-node' },
           { text: '连线自定义', link: '/guide/custom-link' },
+          { text: '悬浮框自定义', link: '/guide/custom-tooltip' },
           { text: '水平与垂直布局', link: '/guide/orientation' },
         ],
       },

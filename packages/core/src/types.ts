@@ -89,9 +89,25 @@ export type NodeRenderer = (context: NodeRenderContext) => void
  */
 export type NodeTemplate = (data: TreeNodeData, variant: NodeVariant) => string | HTMLElement
 
+/** 悬浮框回调上下文：节点在当前视图中的位置与收起状态 */
+export interface TooltipContext {
+  /** 节点深度（根为 0） */
+  depth: number
+  /** 节点所在侧：left / right，根为 center */
+  side: Side | 'center'
+  /** 节点当前是否处于收起态（本地子级已折叠不显示） */
+  collapsed: boolean
+}
+
 export interface TooltipOptions {
-  /** 自定义 tooltip 内容（返回 HTML 字符串）；缺省渲染 properties 键值表 */
-  formatter?: (node: TreeNodeData) => string
+  /**
+   * 自定义 tooltip 内容：返回 HTML 字符串或 DOM 元素；缺省渲染 properties 键值表。
+   * 字符串按 HTML 解析，转义由调用端负责；返回元素则原样挂入悬浮层，
+   * 可承载框架组件宿主（如 Vue render() / React createRoot() 渲染后的容器）。
+   */
+  formatter?: (node: TreeNodeData, ctx: TooltipContext) => string | HTMLElement
+  /** 追加到悬浮层的 class（内置外壳样式保留，可用 CSS 覆盖） */
+  className?: string
 }
 
 /** 内置文案定制（缺省中文）：聚合节点与徽标悬停提示，供国际化替换 */

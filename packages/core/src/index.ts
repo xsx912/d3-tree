@@ -16,6 +16,7 @@ export type {
   Orientation,
   Side,
   TextMeasurer,
+  TooltipContext,
   TooltipOptions,
   TreeInstance,
   TreeNodeData,

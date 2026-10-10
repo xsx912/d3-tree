@@ -16,6 +16,7 @@ import type {
   NodeTemplate,
   Orientation,
   TextMeasurer,
+  TooltipContext,
   TreeInstance,
   TreeNodeData,
   TreeOptions,
@@ -194,7 +195,7 @@ export function createBidirectionalTree(
     container.style.position = 'relative'
   }
   const tooltipEl = document.createElement('div')
-  tooltipEl.className = 'd3t-tooltip'
+  tooltipEl.className = `d3t-tooltip${options.tooltip?.className ? ` ${options.tooltip.className}` : ''}`
   Object.assign(tooltipEl.style, {
     display: 'none',
     position: 'absolute',
@@ -229,9 +230,16 @@ export function createBidirectionalTree(
 
   function showTooltip(event: MouseEvent, d: LayoutNode): void {
     if (d.variant === 'aggregate') return
-    tooltipEl.innerHTML = options.tooltip?.formatter
-      ? options.tooltip.formatter(d.data)
+    const ctx: TooltipContext = {
+      depth: d.depth,
+      side: d.side,
+      collapsed: collapsedIds.has(d.key),
+    }
+    const content = options.tooltip?.formatter
+      ? options.tooltip.formatter(d.data, ctx)
       : defaultTooltipHtml(d.data)
+    if (typeof content === 'string') tooltipEl.innerHTML = content
+    else tooltipEl.replaceChildren(content)
     tooltipEl.style.display = 'block'
     moveTooltip(event)
   }

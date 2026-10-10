@@ -13,6 +13,7 @@ import type {
   Side,
   TextMeasurer,
   Theme,
+  TooltipContext,
   TreeInstance,
   TreeNodeData,
   TreeOptions,
@@ -38,7 +39,10 @@ export interface BidirectionalTreeProps {
   nodeRenderer?: NodeRenderer
   nodeTemplate?: NodeTemplate
   nodeColor?: (node: TreeNodeData) => string | undefined
-  tooltipFormatter?: (node: TreeNodeData) => string
+  /** 自定义悬浮框内容：返回 HTML 字符串或 DOM 元素（可承载组件宿主） */
+  tooltipFormatter?: (node: TreeNodeData, ctx: TooltipContext) => string | HTMLElement
+  /** 追加到悬浮层的 class（内置外壳保留） */
+  tooltipClassName?: string
   loadChildren?: (parent: TreeNodeData) => Promise<TreeNodeData[]>
   onLoadError?: (error: unknown, parent: TreeNodeData) => void
   /** 主题定制：浅合并到内置主题 */
@@ -105,6 +109,7 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       nodeTemplate,
       nodeColor,
       tooltipFormatter,
+      tooltipClassName,
       loadChildren,
       toggleOnNodeClick,
       measureText,
@@ -130,7 +135,13 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
         nodeRenderer,
         nodeTemplate,
         nodeColor,
-        tooltip: tooltipFormatter ? { formatter: tooltipFormatter } : undefined,
+        tooltip:
+          tooltipFormatter || tooltipClassName
+            ? {
+                formatter: tooltipFormatter ?? undefined,
+                className: tooltipClassName ?? undefined,
+              }
+            : undefined,
         loadChildren,
         onLoadError: (error, parent) => propsRef.current.onLoadError?.(error, parent),
         toggleOnNodeClick,
@@ -167,6 +178,7 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       nodeTemplate,
       nodeColor,
       tooltipFormatter,
+      tooltipClassName,
       loadChildren,
       toggleOnNodeClick,
       measureText,
