@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>双向树图谱 · 懒加载</title>
+    <link rel="stylesheet" href="/src/toolbar.css" />
+    <style>
+      #toolbar label {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        font-size: 13px;
+        color: #303133;
+        cursor: pointer;
+        user-select: none;
+      }
+      #toolbar label input { cursor: pointer; }
+      .stat { font-size: 12px; color: #909399; white-space: nowrap; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>双向树图谱 · Mock 接口懒加载</h1>
+      <nav>
+        <a href="/index.html">原生</a>
+        <a href="/vue.html">Vue</a>
+        <a href="/react.html">React</a>
+        <a href="/custom.html">自定义</a>
+        <a href="/lazy.html">懒加载</a>
+      </nav>
+    </header>
+    <div id="toolbar">
+      <label><input type="checkbox" id="fail-toggle" /> 模拟接口失败</label>
+      <span style="width: 1px; height: 18px; background: #dcdfe6;"></span>
+      <button id="btn-fit">适配视窗</button>
+      <span id="req-count" class="stat">Mock 请求：0 次</span>
+      <span id="hint">
+        点击节点展开/收起：本地已有下一级则直接本地切换（不请求）；带 + 徽标且无下一级时自动请求
+        Mock 接口拉取下一级
+      </span>
+    </div>
+    <div id="chart"></div>
+    <script type="module" src="/src/lazy-page/main.ts"></script>
+  </body>
+</html>
