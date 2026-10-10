@@ -11,9 +11,12 @@ import type {
   NodeSizeFn,
   NodeTemplate,
   Side,
+  TextMeasurer,
+  Theme,
   TreeInstance,
   TreeNodeData,
   TreeOptions,
+  TreeTexts,
 } from '@d3-tree/core'
 
 export interface BidirectionalTreeProps {
@@ -37,6 +40,13 @@ export interface BidirectionalTreeProps {
   nodeColor?: (node: TreeNodeData) => string | undefined
   tooltipFormatter?: (node: TreeNodeData) => string
   loadChildren?: (parent: TreeNodeData) => Promise<TreeNodeData[]>
+  onLoadError?: (error: unknown, parent: TreeNodeData) => void
+  /** 主题定制：浅合并到内置主题 */
+  theme?: Partial<Theme>
+  /** 内置文案定制（聚合节点/徽标提示），用于国际化 */
+  texts?: TreeTexts
+  /** 文本度量注入（测试确定性） */
+  measureText?: TextMeasurer
   onNodeClick?: (node: TreeNodeData) => void
   onNodeToggle?: (node: TreeNodeData, collapsed: boolean) => void
   onNodeSelect?: (node: TreeNodeData) => void
@@ -97,6 +107,9 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       tooltipFormatter,
       loadChildren,
       toggleOnNodeClick,
+      measureText,
+      theme: themeOverride,
+      texts,
     } = props
     useEffect(() => {
       if (!hostRef.current) return
@@ -119,7 +132,11 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
         nodeColor,
         tooltip: tooltipFormatter ? { formatter: tooltipFormatter } : undefined,
         loadChildren,
+        onLoadError: (error, parent) => propsRef.current.onLoadError?.(error, parent),
         toggleOnNodeClick,
+        measureText,
+        theme: themeOverride,
+        texts,
         onNodeClick: node => propsRef.current.onNodeClick?.(node),
         onNodeToggle: (node, collapsed) => propsRef.current.onNodeToggle?.(node, collapsed),
         onNodeSelect: node => propsRef.current.onNodeSelect?.(node),
@@ -132,7 +149,7 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
         chartRef.current = null
         optionsRef.current = null
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      // data 走独立 effect，事件回调经 propsRef 读最新闭包
     }, [
       duration,
       fadeOpacity,
@@ -152,6 +169,9 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       tooltipFormatter,
       loadChildren,
       toggleOnNodeClick,
+      measureText,
+      themeOverride,
+      texts,
     ])
 
     // data 变化 → setData（保持实例与折叠/搜索状态语义由 core 处理）
