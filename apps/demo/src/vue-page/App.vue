@@ -83,30 +83,49 @@ function onGroupsChange(gs: Array<{ name: string; color: string }>): void {
   <header>
     <h1>双向树图谱 · Vue 3 组件</h1>
     <nav>
-      <a href="/index.html">原生</a>
-      <a href="/vue.html">Vue</a>
+      <a href="/index.html">示例中心</a>
+      <a href="/vue.html" class="active" aria-current="page">Vue</a>
       <a href="/react.html">React</a>
-      <a href="/custom.html">自定义</a>
-      <a href="/lazy.html">懒加载</a>
     </nav>
   </header>
   <div id="toolbar">
-    <button @click="setMode('add')">追加子节点</button>
-    <input v-if="mode === 'add'" v-model="newName" placeholder="新节点名称"
-      @keydown.enter="confirmAdd" />
-    <button v-if="mode === 'add'" class="primary" @click="confirmAdd">确认追加</button>
-    <button v-if="mode !== 'none'" @click="setMode('none')">取消</button>
-    <button :disabled="mode === 'add'" @click="onRemove">删除节点</button>
+    <div class="tb-group" role="group" aria-label="编辑">
+      <span class="tb-label">编辑</span>
+      <div class="tb-controls">
+        <button @click="setMode('add')">追加子节点</button>
+        <button :disabled="mode === 'add'" @click="onRemove">删除节点</button>
+        <input v-if="mode === 'add'" v-model="newName" placeholder="新节点名称" aria-label="新节点名称"
+          @keydown.enter="confirmAdd" />
+        <button v-if="mode === 'add'" class="primary" @click="confirmAdd">确认追加</button>
+        <button v-if="mode !== 'none'" @click="setMode('none')">取消</button>
+      </div>
+    </div>
     <span class="divider"></span>
-    <input v-model="searchKw" placeholder="搜索节点…" @input="onSearch" />
-    <button @click="tree?.exportImage({ format: 'svg', filename: '产业链图谱-Vue' })">导出 SVG</button>
-    <button @click="tree?.exportImage({ format: 'png', scale: 2, filename: '产业链图谱-Vue' })">导出 PNG</button>
+    <div class="tb-group" role="group" aria-label="搜索">
+      <span class="tb-label">搜索</span>
+      <div class="tb-controls">
+        <input v-model="searchKw" placeholder="关键词…" aria-label="搜索节点" @input="onSearch" />
+      </div>
+    </div>
     <span class="divider"></span>
-    <button @click="tree?.expandAll(); tree?.zoomToFit()">全展开</button>
-    <button @click="tree?.collapseAll(); tree?.zoomToFit()">全收起</button>
-    <button @click="tree?.zoomToFit()">适配视窗</button>
+    <div class="tb-group" role="group" aria-label="导出">
+      <span class="tb-label">导出</span>
+      <div class="tb-controls">
+        <button @click="tree?.exportImage({ format: 'svg', filename: '产业链图谱-Vue' })">SVG</button>
+        <button @click="tree?.exportImage({ format: 'png', scale: 2, filename: '产业链图谱-Vue' })">PNG</button>
+      </div>
+    </div>
+    <span class="divider"></span>
+    <div class="tb-group" role="group" aria-label="视图">
+      <span class="tb-label">视图</span>
+      <div class="tb-controls">
+        <button @click="tree?.expandAll(); tree?.zoomToFit()">全展开</button>
+        <button @click="tree?.collapseAll(); tree?.zoomToFit()">全收起</button>
+        <button @click="tree?.zoomToFit()">适配视窗</button>
+      </div>
+    </div>
     <span id="hint" :class="{ active: mode !== 'none' }">{{ hint }}</span>
-    <div id="legend">
+    <div id="legend" aria-label="分组图例">
       <span v-for="g in groups" :key="g.name" class="chip"
         :class="{ off: !activeGroups.has(g.name) }" @click="toggleGroup(g.name)">
         <span class="dot" :style="{ background: g.color }"></span>{{ g.name }}

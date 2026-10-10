@@ -97,68 +97,90 @@ export default function App() {
       <header>
         <h1>双向树图谱 · React 组件</h1>
         <nav>
-          <a href="/index.html">原生</a>
+          <a href="/index.html">示例中心</a>
           <a href="/vue.html">Vue</a>
-          <a href="/react.html">React</a>
-          <a href="/custom.html">自定义</a>
-          <a href="/lazy.html">懒加载</a>
+          <a href="/react.html" className="active" aria-current="page">
+            React
+          </a>
         </nav>
       </header>
       <div id="toolbar">
-        <button onClick={() => enterMode('add')}>追加子节点</button>
-        {mode === 'add' && (
-          <>
-            <input
-              value={newName}
-              placeholder="新节点名称"
-              onChange={e => setNewName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && confirmAdd()}
-            />
-            <button className="primary" onClick={confirmAdd}>
-              确认追加
+        <div className="tb-group" role="group" aria-label="编辑">
+          <span className="tb-label">编辑</span>
+          <div className="tb-controls">
+            <button onClick={() => enterMode('add')}>追加子节点</button>
+            <button disabled={mode === 'add'} onClick={onRemove}>
+              删除节点
             </button>
-          </>
-        )}
-        {mode !== 'none' && <button onClick={() => enterMode('none')}>取消</button>}
-        <button disabled={mode === 'add'} onClick={onRemove}>
-          删除节点
-        </button>
+            {mode === 'add' && (
+              <>
+                <input
+                  value={newName}
+                  placeholder="新节点名称"
+                  aria-label="新节点名称"
+                  onChange={e => setNewName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && confirmAdd()}
+                />
+                <button className="primary" onClick={confirmAdd}>
+                  确认追加
+                </button>
+              </>
+            )}
+            {mode !== 'none' && <button onClick={() => enterMode('none')}>取消</button>}
+          </div>
+        </div>
         <span className="divider" />
-        <input value={searchKw} placeholder="搜索节点…" onChange={onSearch} />
-        <button
-          onClick={() => tree.current?.exportImage({ format: 'svg', filename: '产业链图谱-React' })}
-        >
-          导出 SVG
-        </button>
-        <button
-          onClick={() =>
-            tree.current?.exportImage({ format: 'png', scale: 2, filename: '产业链图谱-React' })
-          }
-        >
-          导出 PNG
-        </button>
+        <div className="tb-group" role="group" aria-label="搜索">
+          <span className="tb-label">搜索</span>
+          <div className="tb-controls">
+            <input value={searchKw} placeholder="关键词…" aria-label="搜索节点" onChange={onSearch} />
+          </div>
+        </div>
         <span className="divider" />
-        <button
-          onClick={() => {
-            tree.current?.expandAll()
-            tree.current?.zoomToFit()
-          }}
-        >
-          全展开
-        </button>
-        <button
-          onClick={() => {
-            tree.current?.collapseAll()
-            tree.current?.zoomToFit()
-          }}
-        >
-          全收起
-        </button>
-        <button onClick={() => tree.current?.zoomToFit()}>适配视窗</button>
+        <div className="tb-group" role="group" aria-label="导出">
+          <span className="tb-label">导出</span>
+          <div className="tb-controls">
+            <button
+              onClick={() => tree.current?.exportImage({ format: 'svg', filename: '产业链图谱-React' })}
+            >
+              SVG
+            </button>
+            <button
+              onClick={() =>
+                tree.current?.exportImage({ format: 'png', scale: 2, filename: '产业链图谱-React' })
+              }
+            >
+              PNG
+            </button>
+          </div>
+        </div>
+        <span className="divider" />
+        <div className="tb-group" role="group" aria-label="视图">
+          <span className="tb-label">视图</span>
+          <div className="tb-controls">
+            <button
+              onClick={() => {
+                tree.current?.expandAll()
+                tree.current?.zoomToFit()
+              }}
+            >
+              全展开
+            </button>
+            <button
+              onClick={() => {
+                tree.current?.collapseAll()
+                tree.current?.zoomToFit()
+              }}
+            >
+              全收起
+            </button>
+            <button onClick={() => tree.current?.zoomToFit()}>适配视窗</button>
+          </div>
+        </div>
         <span id="hint" className={mode !== 'none' ? 'active' : undefined}>
           {hint}
         </span>
-        <div id="legend">
+        <div id="legend" aria-label="分组图例">
           {groups.map(g => (
             <span
               key={g.name}

@@ -23,8 +23,6 @@ export default defineConfig({
         main: r('./index.html'),
         vue: r('./vue.html'),
         react: r('./react.html'),
-        custom: r('./custom.html'),
-        lazy: r('./lazy.html'),
       },
     },
   },

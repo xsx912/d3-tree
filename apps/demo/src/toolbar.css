@@ -1,43 +1,164 @@
+/* ============================================================
+   d3-tree demo 站共享样式：设计令牌 + 布局骨架 + 工具栏组件
+   五页（原生/Vue/React/自定义/懒加载）共用，页面不再自带样式块
+   ============================================================ */
+
+:root {
+  --brand: #1e6eff;
+  --brand-hover: #1a5fe0;
+  --brand-weak: #edf3ff;
+  --brand-border: #b8d0ff;
+  --border: #e4e7ed;
+  --border-strong: #dcdfe6;
+  --text: #303133;
+  --text-2: #606266;
+  --text-3: #909399;
+  --bg-subtle: #f7f8fa;
+  --bg-header: #ffffff;
+  --danger: #e8684a;
+  --radius: 6px;
+  --radius-pill: 999px;
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #fff;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #fff;
   display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+  color: var(--text);
 }
+
+/* ---- 顶部：品牌 + 页面导航（tab 式，当前页高亮） ---- */
 header {
-  display: flex; align-items: center; gap: 16px;
-  padding: 10px 20px; border-bottom: 1px solid #EBEEF5;
+  display: flex; align-items: center; gap: 20px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-header);
 }
-header h1 { font-size: 16px; color: #303133; font-weight: 600; }
-nav a { font-size: 13px; color: #1E6EFF; text-decoration: none; margin-right: 12px; }
-nav a:hover { text-decoration: underline; }
-#toolbar {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
-  padding: 8px 20px; border-bottom: 1px solid #EBEEF5; background: #FAFAFA;
+header h1 {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 15px; font-weight: 600; color: var(--text);
+  white-space: nowrap;
 }
-#toolbar button {
-  padding: 5px 12px; font-size: 13px; border: 1px solid #DCDFE6; border-radius: 4px;
-  background: #fff; color: #303133; cursor: pointer;
+header h1::before {
+  content: '';
+  width: 10px; height: 10px; border-radius: 3px;
+  background: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-weak);
 }
-#toolbar button:hover { border-color: #1E6EFF; color: #1E6EFF; }
-#toolbar button:disabled { opacity: 0.45; cursor: not-allowed; }
-#toolbar button.primary { background: #1E6EFF; border-color: #1E6EFF; color: #fff; }
-#toolbar button.primary:hover { opacity: 0.88; }
-#toolbar input {
-  padding: 5px 10px; font-size: 13px; border: 1px solid #DCDFE6; border-radius: 4px;
-  outline: none; width: 160px;
+nav { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+nav a {
+  font-size: 13px; color: var(--text-2); text-decoration: none;
+  padding: 4px 14px; border-radius: var(--radius-pill);
+  transition: background 0.15s, color 0.15s;
+  cursor: pointer;
 }
-#toolbar input:focus { border-color: #1E6EFF; }
-#hint { font-size: 13px; color: #909399; }
-#hint.active { color: #E8684A; }
-#legend { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+nav a:hover { background: var(--bg-subtle); color: var(--brand); }
+nav a.active { background: var(--brand-weak); color: var(--brand); font-weight: 500; }
+nav a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+[role='group'] :focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* ---- 工具栏：分组布局（小标签 + 控件行） ---- */
+#toolbar, .toolbar {
+  display: flex; align-items: stretch; flex-wrap: wrap;
+  gap: 4px 18px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+.tb-group { display: flex; flex-direction: column; gap: 3px; justify-content: center; }
+.tb-label {
+  font-size: 11px; line-height: 1; color: var(--text-3);
+  letter-spacing: 0.08em; user-select: none;
+}
+.tb-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+
+/* 分组间竖分隔 */
+.divider {
+  width: 1px; align-self: stretch; margin: 2px 0;
+  background: var(--border-strong); flex: none;
+}
+
+/* ---- 控件 ---- */
+#toolbar button, .toolbar button {
+  padding: 5px 12px; font-size: 13px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius);
+  background: #fff; color: var(--text-2);
+  cursor: pointer; white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+#toolbar button:hover, .toolbar button:hover {
+  border-color: var(--brand); color: var(--brand);
+}
+#toolbar button:disabled, .toolbar button:disabled {
+  opacity: 0.45; cursor: not-allowed;
+  border-color: var(--border-strong); color: var(--text-2);
+}
+#toolbar button.primary, .toolbar button.primary {
+  background: var(--brand); border-color: var(--brand); color: #fff;
+}
+#toolbar button.primary:hover, .toolbar button.primary:hover {
+  background: var(--brand-hover); color: #fff;
+}
+/* 模式/开关类按钮的选中态（分段控件） */
+#toolbar button.active, .toolbar button.active {
+  background: var(--brand); border-color: var(--brand); color: #fff;
+}
+
+#toolbar input, .toolbar input {
+  padding: 5px 10px; font-size: 13px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius);
+  outline: none; width: 150px; color: var(--text);
+  background: #fff;
+  transition: border-color 0.15s;
+}
+#toolbar input:focus, .toolbar input:focus { border-color: var(--brand); }
+
+/* 复选框行（懒加载页“模拟接口失败”） */
+.tb-check {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--text-2);
+  cursor: pointer; user-select: none;
+}
+#toolbar .tb-check input, .toolbar .tb-check input {
+  width: auto; margin: 0; accent-color: var(--brand); cursor: pointer;
+}
+
+/* 状态提示：固定在工具栏右侧，过长自动换行不挤按钮 */
+#hint {
+  font-size: 13px; color: var(--text-3);
+  display: flex; align-items: center;
+  margin-left: auto; max-width: 300px;
+  line-height: 1.4;
+}
+#hint.active { color: var(--danger); }
+
+/* 计数徽标（懒加载页 Mock 请求次数） */
+.tb-stat {
+  display: inline-flex; align-items: center;
+  padding: 3px 10px; font-size: 12px; color: var(--text-2);
+  background: #fff; border: 1px solid var(--border);
+  border-radius: var(--radius-pill); white-space: nowrap;
+}
+
+/* 图例 chips */
+#legend { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 #legend .chip {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 3px 10px; font-size: 12px; color: #303133;
-  border: 1px solid #DCDFE6; border-radius: 12px; cursor: pointer; user-select: none;
-  background: #fff; transition: opacity 0.15s;
+  padding: 3px 10px; font-size: 12px; color: var(--text);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-pill);
+  cursor: pointer; user-select: none; background: #fff;
+  transition: opacity 0.15s, border-color 0.15s;
 }
+#legend .chip:hover { border-color: var(--brand); }
 #legend .chip .dot { width: 8px; height: 8px; border-radius: 50%; }
 #legend .chip.off { opacity: 0.35; text-decoration: line-through; }
+
+/* ---- 图表区 ---- */
 #chart { flex: 1 1 auto; min-height: 0; }
 #root { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
-.divider { width: 1px; height: 18px; background: #DCDFE6; }

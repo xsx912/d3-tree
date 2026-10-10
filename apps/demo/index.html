@@ -3,41 +3,39 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>双向树图谱 · 原生</title>
-    <link rel="stylesheet" href="/src/toolbar.css" />
+    <title>d3-tree · 示例中心</title>
   </head>
   <body>
-    <header>
-      <h1>双向树图谱 · 产业链示例</h1>
-      <nav>
-        <a href="/index.html">原生</a>
-        <a href="/vue.html">Vue</a>
-        <a href="/react.html">React</a>
-        <a href="/custom.html">自定义</a>
-        <a href="/lazy.html">懒加载</a>
-      </nav>
+    <header class="slim">
+      <h1>d3-tree 示例中心</h1>
+      <div class="links">
+        <a href="https://github.com/xsx912/d3-tree" target="_blank" rel="noreferrer">GitHub</a>
+      </div>
     </header>
-    <div id="toolbar">
-      <button id="btn-add">追加子节点</button>
-      <input id="node-name" placeholder="新节点名称" hidden />
-      <button id="btn-confirm" class="primary" hidden>确认追加</button>
-      <button id="btn-cancel" hidden>取消</button>
-      <button id="btn-remove">删除节点</button>
-      <span style="width: 1px; height: 18px; background: #DCDFE6;"></span>
-      <input id="search-box" placeholder="搜索节点…" />
-      <button id="btn-export-svg">导出 SVG</button>
-      <button id="btn-export-png">导出 PNG</button>
-      <span style="width: 1px; height: 18px; background: #DCDFE6;"></span>
-      <button id="btn-expand">全展开</button>
-      <button id="btn-collapse">全收起</button>
-      <button id="btn-fit">适配视窗</button>
-      <button id="btn-orient">垂直布局</button>
-      <button id="btn-linkstyle">连线：折线</button>
-      <button id="btn-fade">淡入淡出：关</button>
-      <span id="hint">点击节点可折叠/展开；滚轮缩放、拖拽平移</span>
-      <div id="legend"></div>
+    <div id="layout">
+      <aside id="sidebar" aria-label="示例目录"></aside>
+      <main id="stage">
+        <div id="canvas"></div>
+        <div id="overlay" hidden></div>
+        <div id="hint" hidden></div>
+        <button id="panel-toggle" title="折叠/展开源码面板">›</button>
+      </main>
+      <aside id="panel" aria-label="示例说明与源码">
+        <div id="panel-drag" title="拖动调整宽度"></div>
+        <div id="panel-head">
+          <div id="stack-tabs" role="tablist" aria-label="技术栈">
+            <button data-stack="html" class="active" role="tab" aria-selected="true">原生</button>
+            <button data-stack="vue" role="tab" aria-selected="false">Vue</button>
+            <button data-stack="react" role="tab" aria-selected="false">React</button>
+          </div>
+          <span id="panel-title"></span>
+          <button id="panel-copy">复制</button>
+        </div>
+        <p id="panel-desc"></p>
+        <div id="file-tabs" role="tablist" aria-label="示例文件"></div>
+        <div id="panel-code"><pre><code></code></pre></div>
+      </aside>
     </div>
-    <div id="chart"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/demos/main.ts"></script>
   </body>
 </html>
