@@ -1,5 +1,7 @@
 /** 视觉基线取自参考稿：白底、单一品牌蓝、克制灰阶（Element/AntD 风格）。
  *  实例可通过 options.theme 对任意字段做浅合并覆盖。 */
+/** 不加 as const：Theme 取 typeof theme，字段开放为 string/number，
+ *  options.theme 的 Partial<Theme> 覆盖值才不必等于默认字面量。 */
 export const theme = {
   /** 画布背景（SVG 与导出图片共用） */
   background: '#FFFFFF',
@@ -43,6 +45,6 @@ export const theme = {
     '#FF9D4D',
     '#5D7092',
   ],
-} as const
+}
 
 export type Theme = typeof theme
