@@ -115,3 +115,29 @@ export function mockFetchChildren(parent: TreeNodeData): Promise<TreeNodeData[]>
     }, latency)
   })
 }
+
+/** 悬浮详情缓存（异步 tooltip 示例用）：同节点再次悬停直接命中 */
+const detailCache = new Map<string, Record<string, string>>()
+
+/** 模拟接口：拉取节点悬浮详情（延迟 300~800ms），按 id 缓存；clearDetailCache 可重置演示 */
+export function mockFetchNodeDetail(node: TreeNodeData): Promise<Record<string, string>> {
+  const cached = detailCache.get(node.id)
+  if (cached) return Promise.resolve(cached)
+  const latency = 300 + Math.random() * 500
+  return new Promise(resolve => {
+    setTimeout(() => {
+      const detail: Record<string, string> = {
+        详情: `「${node.name}」的异步详情来自 Mock API`,
+        接口延迟: `${Math.round(latency)}ms`,
+        快照时间: new Date().toLocaleTimeString(),
+      }
+      detailCache.set(node.id, detail)
+      resolve(detail)
+    }, latency)
+  })
+}
+
+/** 清空悬浮详情缓存（演示"再次异步拉取"用） */
+export function clearDetailCache(): void {
+  detailCache.clear()
+}

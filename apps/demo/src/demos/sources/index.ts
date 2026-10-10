@@ -12,6 +12,7 @@ import { nodeTemplateSources } from './node-template'
 import { nodeRendererSources } from './node-renderer'
 import { linkStyleSources } from './link-style'
 import { customTooltipSources } from './custom-tooltip'
+import { asyncTooltipSources } from './async-tooltip'
 import { themeTextsSources } from './theme-texts'
 import { exportImageSources } from './export-image'
 
@@ -33,6 +34,7 @@ export const sources: Record<string, DemoSources> = {
   'node-renderer': nodeRendererSources,
   'link-style': linkStyleSources,
   'custom-tooltip': customTooltipSources,
+  'async-tooltip': asyncTooltipSources,
   'theme-texts': themeTextsSources,
   'export-image': exportImageSources,
 }

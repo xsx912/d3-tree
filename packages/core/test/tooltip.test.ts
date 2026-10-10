@@ -171,4 +171,113 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
     a.dispatchEvent(new MouseEvent('mouseleave'))
     expect(tooltipEl(container).style.display).toBe('none')
   })
+
+  /** 从渲染 DOM 读节点布局坐标（translate）与尺寸（rect），锚定断言用 */
+  function nodeBox(el: SVGGElement): { x: number; y: number; width: number; height: number } {
+    const m = /translate\(([-\d.]+),([-\d.]+)\)/.exec(el.getAttribute('transform') ?? '')
+    expect(m, `节点 transform 应含 translate：${el.getAttribute('transform')}`).toBeTruthy()
+    const rect = el.querySelector('rect')!
+    return {
+      x: Number(m![1]),
+      y: Number(m![2]),
+      width: Number(rect.getAttribute('width')),
+      height: Number(rect.getAttribute('height')),
+    }
+  }
+
+  describe('锚定节点定位（替代跟随光标）', () => {
+    it('右侧节点：悬浮层出现在节点右侧（水平居中于节点），不依赖鼠标坐标', () => {
+      const { container } = mount(fixture())
+
+      const b = nodeById(container, 'b')
+      const box = nodeBox(b)
+      hover(b)
+
+      const tip = tooltipEl(container)
+      // jsdom：size() 回落 800×600、gChart 平移 (400,300)、zoom 恒等
+      expect(parseFloat(tip.style.left)).toBeCloseTo(400 + box.x + box.width / 2 + 12, 5)
+      expect(parseFloat(tip.style.top)).toBeCloseTo(300 + box.y, 5)
+    })
+
+    it('左侧节点：悬浮层出现在节点左侧', () => {
+      const { container } = mount(fixture())
+
+      const a = nodeById(container, 'a')
+      const box = nodeBox(a)
+      hover(a)
+
+      expect(parseFloat(tooltipEl(container).style.left)).toBeCloseTo(
+        400 + box.x - box.width / 2 - 12,
+        5,
+      )
+    })
+
+    it('根节点（center）：悬浮层出现在右侧', () => {
+      const { container } = mount(fixture())
+
+      const root = nodeById(container, 'root')
+      const box = nodeBox(root)
+      hover(root)
+
+      expect(parseFloat(tooltipEl(container).style.left)).toBeCloseTo(400 + box.width / 2 + 12, 5)
+    })
+
+    it('mousemove 不再移动悬浮层', () => {
+      const { container } = mount(fixture())
+
+      const b = nodeById(container, 'b')
+      hover(b)
+      const before = tooltipEl(container).style.left
+
+      b.dispatchEvent(new MouseEvent('mousemove', { clientX: 700, clientY: 500 }))
+      expect(tooltipEl(container).style.left).toBe(before)
+    })
+
+    it('缩放/平移时悬浮层跟随节点重算位置', () => {
+      // 右侧多挂一层，打破 fixture 的左右对称（否则 zoomToFit 算出恒等变换，位置自然不变）
+      const data = fixture()
+      data.children![1]!.children![0]!.children = [{ id: 'b1-x', name: '乙一延伸' }]
+      const { container, tree } = mount(data)
+
+      const b = nodeById(container, 'b')
+      const box = nodeBox(b)
+      hover(b)
+      const before = parseFloat(tooltipEl(container).style.left)
+
+      // zoomToFit 以 duration=0 同步设置 zoom 变换 → 触发 zoom 事件（不重渲染、不清锚点）
+      tree.zoomToFit()
+
+      const tip = tooltipEl(container)
+      const now = parseFloat(tip.style.left)
+      expect(now).not.toBe(before)
+      // 期望值按锚定公式复算：k*(400+x)+tx + 节点半宽*k + 12，k/tx 从 gZoom transform 解析
+      const m = /translate\(([-\d.]+),([-\d.]+)\) scale\(([\d.]+)\)/.exec(
+        container.querySelector('g.d3t-zoom')!.getAttribute('transform') ?? '',
+      )!
+      const [tx, k] = [Number(m[1]), Number(m[3])]
+      expect(now).toBeCloseTo(k * (400 + box.x) + tx + (box.width * k) / 2 + 12, 5)
+    })
+
+    it('垂直布局：上侧节点悬浮层出现在节点上方', () => {
+      const { container } = mount(fixture(), { orientation: 'vertical' })
+
+      const a = nodeById(container, 'a')
+      const box = nodeBox(a)
+      hover(a)
+
+      const tip = tooltipEl(container)
+      expect(parseFloat(tip.style.top)).toBeCloseTo(300 + box.y - box.height / 2 - 12, 5)
+    })
+
+    it('垂直布局：根节点（center）悬浮层出现在下方（根随下侧，同水平布局根随右侧惯例）', () => {
+      const { container } = mount(fixture(), { orientation: 'vertical' })
+
+      const root = nodeById(container, 'root')
+      const box = nodeBox(root)
+      hover(root)
+
+      const tip = tooltipEl(container)
+      expect(parseFloat(tip.style.top)).toBeCloseTo(300 + box.y + box.height / 2 + 12, 5)
+    })
+  })
 })

@@ -99,6 +99,11 @@ export interface TooltipContext {
   collapsed: boolean
 }
 
+/**
+ * 悬浮框定制。定位为锚定节点：贴节点外侧（水平布局：左节点→左侧、右/根→右侧；
+ * 垂直布局方向感知为上/下），容器边缘自动翻转，缩放/平移时跟随节点，不随光标移动；
+ * 聚合节点不显示。
+ */
 export interface TooltipOptions {
   /**
    * 自定义 tooltip 内容：返回 HTML 字符串或 DOM 元素；缺省渲染 properties 键值表。

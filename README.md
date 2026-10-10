@@ -145,7 +145,7 @@ interface TreeNodeData {
 | `linkPathGenerator` | `(link) => string` | 完全自定义连线：返回 SVG path 的 d，优先于 linkStyle（不做形变插值） |
 | `colorByGroup` | `boolean` / `false` | 按 group 调色板着色（白字） |
 | `nodeColor` | `(node) => string` | 自定义节点填充，优先于分组色 |
-| `tooltip.formatter` | `(node, ctx) => string \| HTMLElement` | 悬浮框内容：HTML 字符串或 DOM 元素（可承载组件宿主）；默认名称 + properties 键值表（自动转义）；ctx 为 `{ depth, side, collapsed }` |
+| `tooltip.formatter` | `(node, ctx) => string \| HTMLElement` | 悬浮框内容：HTML 字符串或 DOM 元素（可承载组件宿主）；默认名称 + properties 键值表（自动转义）；ctx 为 `{ depth, side, collapsed }`。悬浮框锚定节点（不随光标）；Vue 用 `#tooltip` 插槽、React 用 `renderTooltip` render-prop 可直接传组件（封装层托管单实例） |
 | `tooltip.className` | `string` | 追加到悬浮层的 class（内置外壳保留，覆盖内联样式需 `!important`） |
 | `loadChildren` | `(parent) => Promise<TreeNodeData[]>` | 异步拉取子节点并入数据；触发时机：点击"展开 (N)"聚合，或展开 `hasChildren` 标记节点（本地已有下一级则不请求，直接本地切换） |
 | `onLoadError` | `(error, parent) => void` | loadChildren 拉取失败回调；缺省仅静默复位 loading 态 |

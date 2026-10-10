@@ -187,6 +187,7 @@ export function createBidirectionalTree(
     .extent(() => [[0, 0], [container.clientWidth || 800, container.clientHeight || 600]])
     .on('zoom', event => {
       gZoom.attr('transform', event.transform.toString())
+      positionTooltip() // 悬浮层锚定节点：缩放/平移时跟随重算
     })
   svg.call(zoomBehavior).on('dblclick.zoom', null) // 双击留给业务，不抢缩放
 
@@ -228,7 +229,11 @@ export function createBidirectionalTree(
     return rows ? `${title}<table>${rows}</table>` : title
   }
 
-  function showTooltip(event: MouseEvent, d: LayoutNode): void {
+  /** 当前锚定的节点（缩放/平移时跟随重算）；隐藏时为 null */
+  let tooltipAnchor: LayoutNode | null = null
+  let tooltipRafId = 0
+
+  function showTooltip(d: LayoutNode): void {
     if (d.variant === 'aggregate') return
     const ctx: TooltipContext = {
       depth: d.depth,
@@ -240,25 +245,66 @@ export function createBidirectionalTree(
       : defaultTooltipHtml(d.data)
     if (typeof content === 'string') tooltipEl.innerHTML = content
     else tooltipEl.replaceChildren(content)
+    tooltipAnchor = d
     tooltipEl.style.display = 'block'
-    moveTooltip(event)
+    positionTooltip()
+    // 内容尺寸在替换后一帧才稳定（字体/React 并发提交），两帧后补一次翻转修正
+    if (typeof requestAnimationFrame === 'function') {
+      cancelAnimationFrame(tooltipRafId)
+      tooltipRafId = requestAnimationFrame(() => {
+        tooltipRafId = requestAnimationFrame(positionTooltip)
+      })
+    }
   }
 
-  function moveTooltip(event: MouseEvent): void {
-    if (tooltipEl.style.display === 'none') return
-    const rect = container.getBoundingClientRect()
+  /**
+   * 锚定定位：悬浮层贴节点外侧（水平布局：左节点→左侧、右/根→右侧；
+   * 垂直布局：上侧→上方、下侧与根→下方），放不下时翻到另一侧，仍放不下才钳制。
+   * 布局坐标 → 容器像素：gChart 居中平移 (w/2,h/2) 与 gZoom 缩放变换复合。
+   */
+  function positionTooltip(): void {
+    const d = tooltipAnchor
+    if (!d || tooltipEl.style.display === 'none') return
+    const { width: cw, height: ch } = size()
+    const { k, x: tx, y: ty } = zoomTransform(svg.node()!)
+    const cx = k * (cw / 2 + d.x) + tx
+    const cy = k * (ch / 2 + d.y) + ty
     const w = tooltipEl.offsetWidth
     const h = tooltipEl.offsetHeight
-    let x = event.clientX - rect.left + 14
-    let y = event.clientY - rect.top + 14
-    if (x + w > rect.width) x = event.clientX - rect.left - w - 10
-    if (y + h > rect.height) y = event.clientY - rect.top - h - 10
-    tooltipEl.style.left = `${Math.max(x, 2)}px`
-    tooltipEl.style.top = `${Math.max(y, 2)}px`
+    const GAP = 12
+    const clamp = (v: number, min: number, max: number): number => Math.min(Math.max(v, min), max)
+    /** 沿轴放置：先外侧，溢出则翻对侧（对侧完全放得下才翻），最后钳制 */
+    const place = (
+      center: number,
+      halfExtent: number,
+      box: number,
+      total: number,
+      outward: boolean,
+    ): number => {
+      let pos = outward ? center + halfExtent + GAP : center - halfExtent - GAP - box
+      if (pos < 2 || pos + box > total - 2) {
+        const flipped = outward ? center - halfExtent - GAP - box : center + halfExtent + GAP
+        if (flipped >= 2 && flipped + box <= total - 2) pos = flipped
+      }
+      return clamp(pos, 2, Math.max(2, total - box - 2))
+    }
+    let x: number
+    let y: number
+    if (options.orientation === 'vertical') {
+      y = place(cy, (d.height * k) / 2, h, ch, d.side !== 'left')
+      x = clamp(cx - w / 2, 2, Math.max(2, cw - w - 2))
+    } else {
+      x = place(cx, (d.width * k) / 2, w, cw, d.side !== 'left')
+      y = clamp(cy - h / 2, 2, Math.max(2, ch - h - 2))
+    }
+    tooltipEl.style.left = `${x}px`
+    tooltipEl.style.top = `${y}px`
   }
 
   function hideTooltip(): void {
     tooltipEl.style.display = 'none'
+    tooltipAnchor = null
+    cancelAnimationFrame(tooltipRafId)
   }
 
   // ---- 高亮/淡化样式注入 ----
@@ -817,8 +863,7 @@ export function createBidirectionalTree(
           activateNode(event, d)
         }
       })
-      .on('mouseenter', (event, d) => showTooltip(event as MouseEvent, d))
-      .on('mousemove', (event) => moveTooltip(event as MouseEvent))
+      .on('mouseenter', (_event, d) => showTooltip(d))
       .on('mouseleave', hideTooltip)
 
     if (customNodeRender) {
@@ -1060,6 +1105,7 @@ export function createBidirectionalTree(
       resizeObserver?.disconnect()
       svg.remove()
       tooltipEl.remove()
+      cancelAnimationFrame(tooltipRafId)
       styleEl.remove()
     },
   }

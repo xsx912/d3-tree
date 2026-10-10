@@ -12,6 +12,7 @@ import { nodeTemplate } from './items/node-template'
 import { nodeRenderer } from './items/node-renderer'
 import { linkStyle } from './items/link-style'
 import { customTooltip } from './items/custom-tooltip'
+import { asyncTooltip } from './items/async-tooltip'
 import { themeTexts } from './items/theme-texts'
 import { exportImage } from './items/export-image'
 
@@ -34,7 +35,7 @@ export const categories: DemoCategory[] = [
   },
   {
     label: '自定义渲染',
-    entries: [nodeTemplate, nodeRenderer, linkStyle, customTooltip, themeTexts],
+    entries: [nodeTemplate, nodeRenderer, linkStyle, customTooltip, asyncTooltip, themeTexts],
   },
   {
     label: '导出',

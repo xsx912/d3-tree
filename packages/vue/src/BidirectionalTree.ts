@@ -1,4 +1,13 @@
-import { defineComponent, h, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import {
+  defineComponent,
+  getCurrentInstance,
+  h,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  render,
+  watch,
+} from 'vue'
 import type { PropType, StyleValue } from 'vue'
 import { createBidirectionalTree } from '@d3-tree/core'
 import type {
@@ -42,6 +51,18 @@ export interface BidirectionalTreeExposed {
  * ```vue
  * <BidirectionalTree ref="tree" :data="data" color-by-group
  *   @node-click="onClick" @groups-change="onGroups" />
+ * ```
+ *
+ * 悬浮框内容可用 `#tooltip` 作用域插槽（`{ node, ctx }`）自定义：封装层托管
+ * 单实例宿主（常驻挂载、hover 只更新 props、移出仅隐藏不卸载），插槽内可直接
+ * 发请求/起定时器（异步拉取 + 缓存建议放在插槽根组件里 watch node 实现）。
+ *
+ * ```vue
+ * <BidirectionalTree :data="data">
+ *   <template #tooltip="{ node, ctx }">
+ *     <NodeCard :node="node" :ctx="ctx" />
+ *   </template>
+ * </BidirectionalTree>
  * ```
  */
 export const BidirectionalTree = defineComponent({
@@ -96,11 +117,37 @@ export const BidirectionalTree = defineComponent({
     style: { type: [String, Object, Array] as PropType<StyleValue>, default: undefined },
   },
   emits: ['node-click', 'node-toggle', 'node-select', 'groups-change', 'load-error'],
-  setup(props, { emit, expose }) {
+  setup(props, { emit, expose, slots }) {
     const host = ref<HTMLDivElement>()
     let chart: TreeInstance | null = null
     let currentOptions: TreeOptions | null = null
     let toggleFlag = props.toggleOnNodeClick !== false
+
+    // ---- #tooltip 作用域插槽：单实例宿主（常驻挂载，hover 只换 props，移出仅隐藏不卸载） ----
+    const instance = getCurrentInstance()
+    let tooltipHostEl: HTMLDivElement | null = null
+    // 根组件类型恒定：render() 再次调用走 patch，插槽内容所在实例不重挂载；
+    // 每次渲染动态读 slots.tooltip（父组件更新插槽后闭包不持旧函数）
+    const TooltipSlotHost = defineComponent({
+      props: {
+        node: { type: Object as PropType<TreeNodeData>, required: true },
+        ctx: { type: Object as PropType<TooltipContext>, required: true },
+      },
+      render() {
+        return (
+          slots.tooltip as (props: { node: TreeNodeData; ctx: TooltipContext }) => unknown[]
+        )({ node: this.node, ctx: this.ctx })
+      },
+    })
+
+    function renderTooltipSlot(node: TreeNodeData, ctx: TooltipContext): HTMLElement {
+      if (!tooltipHostEl) tooltipHostEl = document.createElement('div')
+      const vnode = h(TooltipSlotHost, { node, ctx })
+      // 命令式 render 脱离父组件树：携带 appContext 保留 provide/inject 与全局注册
+      if (instance) vnode.appContext = instance.appContext
+      render(vnode, tooltipHostEl)
+      return tooltipHostEl
+    }
 
     function create(): void {
       if (!host.value) return
@@ -121,9 +168,10 @@ export const BidirectionalTree = defineComponent({
         nodeRenderer: props.nodeRenderer ?? undefined,
         nodeTemplate: props.nodeTemplate ?? undefined,
         nodeColor: props.nodeColor ?? undefined,
-        tooltip: props.tooltipFormatter || props.tooltipClassName
+        tooltip: slots.tooltip || props.tooltipFormatter || props.tooltipClassName
           ? {
-              formatter: props.tooltipFormatter ?? undefined,
+              // 插槽优先于 tooltipFormatter（更富的表达）；两者都返回元素给 core 挂载
+              formatter: slots.tooltip ? renderTooltipSlot : props.tooltipFormatter ?? undefined,
               className: props.tooltipClassName ?? undefined,
             }
           : undefined,
@@ -145,6 +193,11 @@ export const BidirectionalTree = defineComponent({
       chart?.destroy()
       chart = null
       currentOptions = null
+      // 卸载插槽宿主（重建/组件销毁时；hover 路径不经过这里，实例常驻）
+      if (tooltipHostEl) {
+        render(null, tooltipHostEl)
+        tooltipHostEl = null
+      }
     }
 
     onMounted(create)

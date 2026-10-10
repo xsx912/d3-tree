@@ -1,6 +1,6 @@
 # 悬浮框自定义
 
-鼠标悬停节点时，图表在容器内显示跟随光标的悬浮框（聚合节点除外）。缺省渲染节点名 + `properties` 键值表；通过 `tooltip.formatter` 可完全接管内容。
+鼠标悬停节点时，图表在容器内显示悬浮框（聚合节点除外）。**悬浮框锚定节点**：出现在节点外侧（水平布局：左节点→左侧、右/根→右侧；垂直布局方向感知为上/下），容器边缘自动翻转，缩放/平移时跟随节点，不随光标移动。缺省渲染节点名 + `properties` 键值表；通过 `tooltip.formatter` 可完全接管内容。
 
 ## tooltip.formatter —— 字符串或元素
 
@@ -42,6 +42,10 @@ formatter: (node, ctx) => {
 
 formatter 在**每次 mouseenter 时调用**，内容随节点切换；分支读闭包变量即可热切换内容形态，无需重建实例。注意：旧内容被替换时库不调用任何卸载钩子——React `createRoot` 宿主等需要清理的场景，由调用端在 formatter 内自行管理（如复用同一宿主元素）。
 
+::: tip 性能：复用单实例
+不要每次 formatter 都新建 app/root——**复用同一个宿主元素**，内部只更新响应式状态或重渲染，DOM 层面只是节点挪位，组件实例不会重挂载。更好的方式是直接用封装层的组件 API（下两节），单实例由封装层托管。
+:::
+
 ## TooltipContext
 
 第二个参数是节点在当前视图中的位置与状态：
@@ -66,14 +70,59 @@ tooltip: { className: 'biz-tip' }
 .biz-tip { border-radius: 10px !important; }
 ```
 
-## 框架封装
+## Vue：#tooltip 作用域插槽
 
-Vue / React 以 `tooltip-formatter` / `tooltip-class-name`（React 为 `tooltipFormatter` / `tooltipClassName`）props 透传，语义与 core 一致：
+`@d3-tree/vue` 提供作用域插槽，插槽内容即悬浮框内容；**封装层托管单实例宿主**（常驻挂载、hover 只更新 props、移出仅隐藏不卸载），携带 appContext 保留 provide/inject：
 
 ```vue
-<BidirectionalTree :data="data" :tooltip-formatter="formatter" tooltip-class-name="biz-tip" />
+<BidirectionalTree :data="data" tooltip-class-name="biz-tip">
+  <template #tooltip="{ node, ctx }">
+    <NodeCard :node="node" :ctx="ctx" />
+  </template>
+</BidirectionalTree>
 ```
 
-注意：封装层把 formatter 视为配置项——**函数身份变化会销毁重建实例**。需要热切换内容时，保持函数身份稳定（Vue 在 setup 作用域定义一次；React 用 `useCallback` + ref 读最新值）。
+插槽与 `tooltipFormatter` 同时提供时插槽优先。
 
-完整示例见示例中心（`apps/demo`）的「悬浮框内容自定义」，三种技术栈的可粘贴源码与画布一一对应。
+## React：renderTooltip render-prop
+
+`@d3-tree/react` 提供 render-prop；**封装层托管常驻 `createRoot`**（单实例，hover 只重渲染，卸载时机在组件卸载/重建时）：
+
+```tsx
+const renderTooltip = useCallback(
+  (node: TreeNodeData, ctx: TooltipContext) => <NodeCard node={node} ctx={ctx} />,
+  [],
+)
+
+<BidirectionalTree data={data} renderTooltip={renderTooltip} tooltipClassName="biz-tip" />
+```
+
+注意两点：函数身份变化会销毁重建整树（建议 `useCallback`）；返回树的根组件类型保持稳定（一直渲染 `NodeCard`）才能复用实例。`renderTooltip` 优先于 `tooltipFormatter`。react-dom 是 `@d3-tree/react` 的 peerDependency。
+
+## 异步内容：拉取 + 缓存 + 过期丢弃
+
+单实例常驻后，异步详情放在插槽/render-prop 的**根组件**里最自然：`watch/useEffect` 监听节点 id → 拉取 → 命中缓存秒出；过期响应丢弃（Vue 用序号守卫，React 用 effect cleanup 的 stale 标记，真实业务可用 AbortController）：
+
+```ts
+// Vue：插槽根组件内
+watch(() => props.node.id, () => {
+  const mySeq = ++seq
+  detail.value = null
+  mockFetchNodeDetail(props.node).then(d => {
+    if (mySeq !== seq) return // 悬停已切到其他节点，丢弃
+    detail.value = d
+  })
+}, { immediate: true })
+```
+
+```ts
+// React：卡片组件内
+useEffect(() => {
+  let stale = false
+  setDetail(null)
+  mockFetchNodeDetail(node).then(d => { if (!stale) setDetail(d) })
+  return () => { stale = true }
+}, [node.id])
+```
+
+加载期间渲染骨架屏占位即可（悬浮框已锚定节点，不会因内容尺寸变化抖动位置；内容异步变高后的边缘翻转由 core 在下一帧自动修正）。完整示例见示例中心（`apps/demo`）的「异步数据悬浮卡（单实例）」，三种技术栈的可粘贴源码与画布一一对应。

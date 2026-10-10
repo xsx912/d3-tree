@@ -1,5 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
+import { createRoot } from 'react-dom/client'
+import type { Root } from 'react-dom/client'
 import { createBidirectionalTree } from '@d3-tree/core'
 import type {
   ExportImageOptions,
@@ -41,6 +43,13 @@ export interface BidirectionalTreeProps {
   nodeColor?: (node: TreeNodeData) => string | undefined
   /** 自定义悬浮框内容：返回 HTML 字符串或 DOM 元素（可承载组件宿主） */
   tooltipFormatter?: (node: TreeNodeData, ctx: TooltipContext) => string | HTMLElement
+  /**
+   * 悬浮框内容 render-prop：返回 ReactNode。封装层托管常驻 createRoot（单实例：
+   * hover 只重渲染不重挂载，移出仅隐藏）。保持返回树的根组件类型稳定以复用实例；
+   * 函数身份变化会销毁重建整树（建议 useCallback）。异步拉取/缓存放组件内
+   * useEffect(node) 实现。
+   */
+  renderTooltip?: (node: TreeNodeData, ctx: TooltipContext) => ReactNode
   /** 追加到悬浮层的 class（内置外壳保留） */
   tooltipClassName?: string
   loadChildren?: (parent: TreeNodeData) => Promise<TreeNodeData[]>
@@ -87,6 +96,8 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
     const hostRef = useRef<HTMLDivElement>(null)
     const chartRef = useRef<TreeInstance | null>(null)
     const optionsRef = useRef<TreeOptions | null>(null)
+    // 悬浮内容的常驻宿主（renderTooltip 用）：createRoot 单实例，hover 只重渲染
+    const tooltipLayerRef = useRef<{ host: HTMLDivElement; root: Root } | null>(null)
     // 最新 props 引用：事件回调始终读到最新，避免因回调变化重建实例
     const propsRef = useRef(props)
     propsRef.current = props
@@ -109,6 +120,7 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       nodeTemplate,
       nodeColor,
       tooltipFormatter,
+      renderTooltip,
       tooltipClassName,
       loadChildren,
       toggleOnNodeClick,
@@ -136,9 +148,22 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
         nodeTemplate,
         nodeColor,
         tooltip:
-          tooltipFormatter || tooltipClassName
+          renderTooltip || tooltipFormatter || tooltipClassName
             ? {
-                formatter: tooltipFormatter ?? undefined,
+                // render-prop 优先于 tooltipFormatter（更富的表达）
+                formatter: renderTooltip
+                  ? (node, ctx) => {
+                      // 常驻宿主 + createRoot：hover 只重渲染（root 类型稳定即复用实例）
+                      let layer = tooltipLayerRef.current
+                      if (!layer) {
+                        const host = document.createElement('div')
+                        layer = { host, root: createRoot(host) }
+                        tooltipLayerRef.current = layer
+                      }
+                      layer.root.render(renderTooltip(node, ctx))
+                      return layer.host
+                    }
+                  : tooltipFormatter ?? undefined,
                 className: tooltipClassName ?? undefined,
               }
             : undefined,
@@ -159,6 +184,11 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
         chartRef.current?.destroy()
         chartRef.current = null
         optionsRef.current = null
+        // 卸载悬浮内容宿主（重建/组件卸载时；hover 路径不经过这里，实例常驻）
+        if (tooltipLayerRef.current) {
+          tooltipLayerRef.current.root.unmount()
+          tooltipLayerRef.current = null
+        }
       }
       // data 走独立 effect，事件回调经 propsRef 读最新闭包
     }, [
@@ -178,6 +208,7 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       nodeTemplate,
       nodeColor,
       tooltipFormatter,
+      renderTooltip,
       tooltipClassName,
       loadChildren,
       toggleOnNodeClick,
