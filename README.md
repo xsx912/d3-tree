@@ -19,16 +19,16 @@
 - 缩放平移 + `zoomToFit`；分组着色 + tooltip + 图例筛选；搜索高亮定位（含祖先链）；导出 PNG/SVG；编程式增删节点
 - 主题与文案可配：`theme` 浅合并覆盖任意视觉字段（背景/节点/连线/徽标/调色板），`texts` 国际化内置文案
 - 可访问性基线：节点键盘可操作（Enter/Space）、ARIA role/label/expanded、响应系统"减少动态效果"偏好
-- TypeScript 全量类型，Vitest 覆盖公共 API（92 例），ESLint + changesets + GitHub Actions 全链路工程化
+- TypeScript 全量类型，Vitest 覆盖公共 API（105 例），ESLint + changesets + GitHub Actions 全链路工程化
 
 ## 快速开始
 
 ```bash
 pnpm install
-pnpm dev         # demo 三页 + 自定义页（Vite，默认 5183 端口）
+pnpm dev         # 示例中心 + Vue/React 页（Vite，默认 5183 端口）
 pnpm docs:dev    # 文档站（VitePress：安装/活示例/API）
 pnpm docs:build  # 文档站静态产物（apps/docs/.vitepress/dist，可托管任意静态服务）
-pnpm test        # vitest（core 92 例）
+pnpm test        # vitest（core 105 例）
 pnpm lint        # eslint
 pnpm build       # tsup 构建三包（ESM + CJS）
 ```
@@ -134,7 +134,7 @@ interface TreeNodeData {
 | --- | --- | --- |
 | `data` | `TreeNodeData`（必填） | 层级数据 |
 | `duration` | `number` / `250` | 过渡动画时长（ms），`0` 关闭动画 |
-| `fadeOpacity` | `number` / `1` | 展开/收起的淡入淡出透明度（0~1，超出钳制）：展开时新节点与连线从该值淡入至 1，收起时淡出至该值后移除；`1` 即纯位移动画 |
+| `fadeOpacity` | `number` / `0.25` | 展开/收起的淡入淡出透明度（0~1，超出钳制）：展开时新节点与连线从该值淡入至 1，收起时淡出至该值后移除；传 `1` 关闭淡入淡出（纯位移动画） |
 | `rowHeight` | `number` / `48` | 同层兄弟纵向步距 |
 | `columnGap` | `number` / `48` | 深度列水平间距 |
 | `visibleChildrenLimit` | `number` / `5` | 每父节点可见子节点上限，超出聚合"展开 (N)"；`0` 不聚合 |
@@ -150,7 +150,7 @@ interface TreeNodeData {
 | `onLoadError` | `(error, parent) => void` | loadChildren 拉取失败回调；缺省仅静默复位 loading 态 |
 | `theme` | `Partial<Theme>` / 内置主题 | 主题定制：浅合并覆盖背景、节点、连线、徽标、调色板等任意字段 |
 | `texts` | `TreeTexts` / 中文 | 内置文案定制（聚合"展开 (N)"、徽标悬停提示），用于国际化 |
-| `toggleOnNodeClick` | `boolean` / `true` | `false` 时点击节点仅触发回调（编辑选取模式） |
+| `toggleOnNodeClick` | `boolean` / `true` | `false` 时点击节点仅触发回调（编辑选取模式）；内置徽标、聚合节点与自定义节点中 `data-d3t-toggle` 标记区域仍可折叠 |
 | `measureText` | `(text, variant) => number` | 文本度量注入（测试确定性） |
 | `onNodeClick` / `onNodeToggle` / `onNodeSelect` / `onGroupsChange` | 回调 | 节点交互与图例数据事件 |
 
@@ -182,7 +182,7 @@ interface TreeNodeData {
 nodeSize: (data, variant) =>
   variant === 'root' ? { width: 236, height: 64 } : { width: 176, height: 52 },
 
-// 2) SVG 自定义渲染（导出 PNG/SVG 无损）——demo 见 /custom.html "SVG 图标"模式
+// 2) SVG 自定义渲染（导出 PNG/SVG 无损）——活示例见示例中心「SVG 图标节点」
 nodeRenderer: ({ group, data, width, height, side, depth }) => {
   const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
   rect.setAttribute('x', `${-width / 2}`) // …任意 SVG 内容
@@ -197,6 +197,22 @@ nodeTemplate: data => `
 ```
 
 Vue/React 组件以同名 props 透传（`node-size` / `node-renderer` / `node-template`）。
+
+#### 自定义折叠触发区域（data-d3t-toggle）
+
+默认点击节点本体即折叠/展开。自定义节点时若希望**由调用端决定哪块区域触发折叠**：
+给模板/渲染器内容中的目标元素标记 `data-d3t-toggle` 属性，点击它即切换所属节点的折叠态。
+语义与内置徽标一致（阻断冒泡、不触发选中回调、不受 `toggleOnNodeClick` 约束），
+配合 `toggleOnNodeClick: false` 可实现"点击节点本体只回调、仅指定区域可折叠"：
+
+```html
+<div style="display:flex;align-items:center;">
+  <span>${data.name}</span>
+  <span data-d3t-toggle style="cursor:pointer;">展/收</span>
+</div>
+```
+
+活示例见示例中心「自定义折叠触发区域」（右侧圆形箭头即 data-d3t-toggle 标记区域，方向随折叠态刷新）。
 
 ### 连线自定义
 

@@ -14,7 +14,7 @@ function createBidirectionalTree(container: HTMLElement, options: TreeOptions): 
 | --- | --- | --- |
 | `data` | `TreeNodeData`（必填） | 层级数据，见[数据模型](/guide/install#数据模型) |
 | `duration` | `number` / `250` | 过渡动画时长（ms），`0` 关闭动画 |
-| `fadeOpacity` | `number` / `1` | 展开/收起的淡入淡出透明度（0~1，超出钳制）：展开时新节点与连线从该值淡入至 1，收起时淡出至该值后移除；`1` 即纯位移动画 |
+| `fadeOpacity` | `number` / `0.25` | 展开/收起的淡入淡出透明度（0~1，超出钳制）：展开时新节点与连线从该值淡入至 1，收起时淡出至该值后移除；传 `1` 关闭淡入淡出（纯位移动画） |
 | `rowHeight` | `number` / `48` | 兄弟轴步距（垂直模式下语义为兄弟水平间距） |
 | `columnGap` | `number` / `48` | 深度轴列/行间距 |
 | `visibleChildrenLimit` | `number` / `5` | 每父节点可见子节点上限，超出聚合「展开 (N)」；`0` 不聚合 |
@@ -33,7 +33,7 @@ function createBidirectionalTree(container: HTMLElement, options: TreeOptions): 
 | `onLoadError` | `(error, parent) => void` | loadChildren 拉取失败回调；缺省仅静默复位 loading 态 |
 | `theme` | `Partial<Theme>` | 主题定制：浅合并到内置主题（背景/节点色/连线色/徽标/调色板等任意字段） |
 | `texts` | `TreeTexts` | 内置文案定制（聚合节点/徽标提示），用于国际化；缺省中文，见 [TreeTexts](#treetexts) |
-| `toggleOnNodeClick` | `boolean` / `true` | `false` 时点击节点仅触发回调（编辑选取模式） |
+| `toggleOnNodeClick` | `boolean` / `true` | `false` 时点击节点仅触发回调（编辑选取模式）；内置徽标、聚合节点与 `data-d3t-toggle` 标记区域仍可折叠，见[自定义折叠触发区域](#自定义折叠触发区域data-d3t-toggle) |
 | `measureText` | `(text, variant) => number` | 文本度量注入（测试确定性） |
 | `onNodeClick` / `onNodeToggle` / `onNodeSelect` | 回调 | 节点点击 / 折叠切换 / 选取广播 |
 | `onGroupsChange` | `(groups: { name, color }[]) => void` | 分组集合变化（先于首帧触发） |
@@ -99,6 +99,35 @@ interface NodeRenderContext {
   height: number
 }
 ```
+
+## 自定义折叠触发区域（data-d3t-toggle）
+
+默认点击节点本体即折叠/展开。自定义节点（`nodeTemplate` / `nodeRenderer`）时，若希望
+**由调用端决定哪块区域触发折叠**：在节点内容中给目标元素标记 `data-d3t-toggle` 属性即可，
+点击该元素切换所属节点的折叠态。语义与内置 +/− 徽标一致：
+
+- 阻断冒泡——不会同时触发 `onNodeClick` / `onNodeSelect`；
+- 不受 `toggleOnNodeClick` 约束——配合 `toggleOnNodeClick: false` 即可实现
+  "点击节点本体只回调、仅指定区域可折叠"；
+- HTML 模板字符串与 SVG 渲染器绘制的元素均支持。
+
+```html
+<!-- nodeTemplate 示例：只有右侧"展/收"胶囊可折叠 -->
+<div style="display:flex;align-items:center;">
+  <span>${data.name}</span>
+  <span data-d3t-toggle style="cursor:pointer;">展/收</span>
+</div>
+```
+
+```ts
+// nodeRenderer 示例：给 SVG 子元素加同名属性
+const btn = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+btn.setAttribute('data-d3t-toggle', '')
+ctx.group.appendChild(btn)
+```
+
+注意：自定义节点内容只在节点进入时渲染一次，折叠态变化不会重跑模板；
+内置 +/− 徽标始终由图表自动绘制并随状态刷新，需要展示状态时优先使用徽标。
 
 ## LinkRenderContext
 
