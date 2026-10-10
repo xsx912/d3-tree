@@ -30,6 +30,9 @@ function createBidirectionalTree(container: HTMLElement, options: TreeOptions): 
 | `nodeTemplate` | `(data, variant) => string \| HTMLElement` | HTML 模板渲染进 foreignObject |
 | `tooltip.formatter` | `(node) => string` | tooltip HTML（默认名称 + properties 键值表，自动转义） |
 | `loadChildren` | `(parent) => Promise<TreeNodeData[]>` | 点击「展开 (N)」时异步拉取并入数据 |
+| `onLoadError` | `(error, parent) => void` | loadChildren 拉取失败回调；缺省仅静默复位 loading 态 |
+| `theme` | `Partial<Theme>` | 主题定制：浅合并到内置主题（背景/节点色/连线色/徽标/调色板等任意字段） |
+| `texts` | `TreeTexts` | 内置文案定制（聚合节点/徽标提示），用于国际化；缺省中文，见 [TreeTexts](#treetexts) |
 | `toggleOnNodeClick` | `boolean` / `true` | `false` 时点击节点仅触发回调（编辑选取模式） |
 | `measureText` | `(text, variant) => number` | 文本度量注入（测试确定性） |
 | `onNodeClick` / `onNodeToggle` / `onNodeSelect` | 回调 | 节点点击 / 折叠切换 / 选取广播 |
@@ -49,6 +52,36 @@ function createBidirectionalTree(container: HTMLElement, options: TreeOptions): 
 | `zoomToFit()` | 适配视口（只缩小不放大，40px 边距） |
 | `exportImage({ format, scale, filename })` | 导出 SVG / PNG（默认 png、2x） |
 | `destroy()` | 移除 SVG、tooltip、样式、监听与 ResizeObserver |
+
+## TreeTexts
+
+内置文案（缺省中文）的国际化出口：
+
+```ts
+interface TreeTexts {
+  // “展开 (N)”基础文案；方向箭头（< > ↑ ↓）由内部按分侧与布局方向追加
+  aggregateLabel?: (remaining: number) => string
+  badgeExpandTitle?: (descendantCount: number) => string  // 徽标悬停提示：收起态
+  badgeCollapseTitle?: (descendantCount: number) => string // 徽标悬停提示：展开态
+}
+
+// 英文示例
+createBidirectionalTree(el, {
+  data,
+  texts: {
+    aggregateLabel: n => `Expand (${n})`,
+    badgeExpandTitle: n => `Expand (${n} descendants)`,
+    badgeCollapseTitle: n => `Collapse (${n} descendants)`,
+  },
+})
+```
+
+## 可访问性
+
+- 节点组带 `role="treeitem"`（聚合节点为 `role="button"`）、`aria-label`（节点名）与 `tabindex="0"`，支持 <kbd>Enter</kbd> / <kbd>Space</kbd> 激活（点击语义相同：折叠切换 / 释放聚合 / 触发回调）。
+- 含子节点的节点带 `aria-expanded`，随折叠态刷新；+/− 徽标 `aria-hidden="true"`，避免 Tab 序列重复停留。
+- 系统「减少动态效果」（`prefers-reduced-motion: reduce`）开启且未显式配置 `duration` 时，动画自动关闭。
+- 键盘焦点描边与搜索命中共用 `theme.hitStroke`，可通过主题覆盖。
 
 ## NodeRenderContext
 

@@ -17,7 +17,9 @@
 - 折叠展开：对齐官方 [collapsible-tree](https://observablehq.com/@d3/collapsible-tree)（250ms 过渡，子树自点击处长出/回拢），节点本体与 +/− 徽标均可点击
 - 懒加载聚合：子节点超限聚合为"展开 (N)"分批释放，`loadChildren` 异步回调缝可接远程 API
 - 缩放平移 + `zoomToFit`；分组着色 + tooltip + 图例筛选；搜索高亮定位（含祖先链）；导出 PNG/SVG；编程式增删节点
-- TypeScript 全量类型，Vitest 覆盖公共 API（单缝测试）
+- 主题与文案可配：`theme` 浅合并覆盖任意视觉字段（背景/节点/连线/徽标/调色板），`texts` 国际化内置文案
+- 可访问性基线：节点键盘可操作（Enter/Space）、ARIA role/label/expanded、响应系统"减少动态效果"偏好
+- TypeScript 全量类型，Vitest 覆盖公共 API（92 例），ESLint + changesets + GitHub Actions 全链路工程化
 
 ## 快速开始
 
@@ -26,8 +28,9 @@ pnpm install
 pnpm dev         # demo 三页 + 自定义页（Vite，默认 5183 端口）
 pnpm docs:dev    # 文档站（VitePress：安装/活示例/API）
 pnpm docs:build  # 文档站静态产物（apps/docs/.vitepress/dist，可托管任意静态服务）
-pnpm test        # vitest（core 66 例）
-pnpm build       # tsup 构建三包
+pnpm test        # vitest（core 92 例）
+pnpm lint        # eslint
+pnpm build       # tsup 构建三包（ESM + CJS）
 ```
 
 ## 原生使用（@d3-tree/core）
@@ -99,7 +102,16 @@ export function Chart({ data }) {
 }
 ```
 
-`data` 变化走 `setData`（保留实例）；其余配置 props 变化自动重建实例；回调始终读最新闭包。
+`data` 变化走 `setData`（保留实例）；其余配置 props 变化自动重建实例（实例内的缩放/搜索/展开状态会随之重置）；回调始终读最新闭包。
+
+## 开源治理
+
+- **License**：[MIT](LICENSE)
+- **贡献**：见 [CONTRIBUTING.md](CONTRIBUTING.md)（开发环境 / 提交规范 / changeset 流程）
+- **安全**：漏洞请勿公开 Issue，走 [SECURITY.md](SECURITY.md) 的私密报告渠道
+- **行为准则**：[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- **版本管理**：changesets 管理（`pnpm changeset` 声明变更 → 合并 Version PR 自动发布，npm provenance 可验证）
+- **CI**：GitHub Actions 覆盖 lint / typecheck / test / build，文档站随 main 自动部署
 
 ## 数据模型
 
@@ -134,6 +146,9 @@ interface TreeNodeData {
 | `nodeColor` | `(node) => string` | 自定义节点填充，优先于分组色 |
 | `tooltip.formatter` | `(node) => string` | tooltip HTML 内容（默认名称 + properties 键值表，自动转义） |
 | `loadChildren` | `(parent) => Promise<TreeNodeData[]>` | 点击"展开 (N)"时异步拉取子节点并入数据 |
+| `onLoadError` | `(error, parent) => void` | loadChildren 拉取失败回调；缺省仅静默复位 loading 态 |
+| `theme` | `Partial<Theme>` / 内置主题 | 主题定制：浅合并覆盖背景、节点、连线、徽标、调色板等任意字段 |
+| `texts` | `TreeTexts` / 中文 | 内置文案定制（聚合"展开 (N)"、徽标悬停提示），用于国际化 |
 | `toggleOnNodeClick` | `boolean` / `true` | `false` 时点击节点仅触发回调（编辑选取模式） |
 | `measureText` | `(text, variant) => number` | 文本度量注入（测试确定性） |
 | `onNodeClick` / `onNodeToggle` / `onNodeSelect` / `onGroupsChange` | 回调 | 节点交互与图例数据事件 |

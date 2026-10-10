@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用咨询
+    url: https://github.com/xsx912/d3-tree/discussions
+    about: 使用问题与集成咨询请到 Discussions

@@ -1,0 +1,41 @@
+name: 缺陷报告
+description: 报告 d3-tree 的行为异常
+labels: [needs-triage]
+body:
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+      description: 最小可复现代码 / 数据最受欢迎
+      placeholder: |
+        1. 挂载 createBidirectionalTree（或 <BidirectionalTree>）…
+        2. 点击 / 搜索 / 导出…
+        3. 出现…
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 包版本
+      placeholder: 如 @d3-tree/core 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: 环境信息
+      placeholder: 浏览器/框架版本，如 Chrome 130 + Vue 3.5
+    validations:
+      required: true
