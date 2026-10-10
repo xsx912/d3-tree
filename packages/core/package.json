@@ -2,19 +2,52 @@
   "name": "@d3-tree/core",
   "version": "0.1.0",
   "description": "框架无关的 d3 v7 双向树图谱核心（根居中、左右展开）",
+  "keywords": [
+    "d3",
+    "d3js",
+    "tree",
+    "graph",
+    "visualization",
+    "bidirectional-tree",
+    "hierarchy",
+    "mindmap",
+    "svg",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": "xsx912",
+  "homepage": "https://github.com/xsx912/d3-tree#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xsx912/d3-tree.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/xsx912/d3-tree/issues"
+  },
   "type": "module",
-  "main": "./dist/index.js",
+  "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "test": "vitest run",

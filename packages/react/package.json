@@ -2,12 +2,51 @@
   "name": "@d3-tree/react",
   "version": "0.1.0",
   "description": "@d3-tree/core 的 React 组件封装",
-  "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "exports": {
-    ".": "./src/index.ts"
+  "keywords": [
+    "d3",
+    "tree",
+    "graph",
+    "visualization",
+    "react",
+    "react-component",
+    "bidirectional-tree",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": "xsx912",
+  "homepage": "https://github.com/xsx912/d3-tree#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xsx912/d3-tree.git",
+    "directory": "packages/react"
   },
+  "bugs": {
+    "url": "https://github.com/xsx912/d3-tree/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit"
