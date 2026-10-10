@@ -95,6 +95,7 @@ interface TreeNodeData {
   group?: string                // 分组：着色 / 图例筛选 / 搜索
   side?: 'left' | 'right'       // 仅根的直接子节点生效；缺省按数量均分
   collapsed?: boolean           // 初始折叠态
+  hasChildren?: boolean         // 标记"下一级未加载"：展示 + 徽标，点击展开触发 loadChildren 请求
   properties?: Record<string, string | number | boolean | null>  // tooltip 详情
   children?: TreeNodeData[]
 }

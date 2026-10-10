@@ -16,6 +16,12 @@ export interface TreeNodeData {
   side?: Side
   /** 初始折叠态 */
   collapsed?: boolean
+  /**
+   * 标记"存在未加载的下一级"：本地 children 为空时节点仍展示 + 徽标（可展开）；
+   * 配置 loadChildren 后点击展开会触发异步拉取，成功后按普通子节点处理，
+   * 返回空数组则视为末级叶子并清除该标记
+   */
+  hasChildren?: boolean
   /** 悬停 tooltip 展示的键值详情 */
   properties?: Record<string, string | number | boolean | null>
   children?: TreeNodeData[]
@@ -89,6 +95,8 @@ export interface TreeTexts {
   badgeExpandTitle?: (descendantCount: number) => string
   /** 徽标悬停提示：节点处于展开态 */
   badgeCollapseTitle?: (descendantCount: number) => string
+  /** 徽标悬停提示：节点标记 hasChildren 且下一级尚未加载 */
+  badgeLazyExpandTitle?: () => string
 }
 
 export interface TreeOptions {
@@ -129,7 +137,12 @@ export interface TreeOptions {
   /** 节点着色回调（非根节点），返回 CSS 颜色 */
   nodeColor?: (node: TreeNodeData) => string | undefined
   tooltip?: TooltipOptions
-  /** 异步加载子节点回调（点击“展开 (N)”时触发） */
+  /**
+   * 异步加载子节点回调。两个触发时机：
+   * ① 点击"展开 (N)"聚合节点（返回批次并入后全部释放）；
+   * ② 展开带 hasChildren 标记（本地无 children）的节点（点击展开/收起时，
+   *    本地已有下一级则不请求，直接本地切换）。
+   */
   loadChildren?: (parent: TreeNodeData) => Promise<TreeNodeData[]>
   /** loadChildren 拉取失败时回调（错误对象 + 触发的父节点）；缺省仅静默复位 loading 态 */
   onLoadError?: (error: unknown, parent: TreeNodeData) => void

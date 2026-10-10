@@ -15,7 +15,7 @@
 - 双向布局：变宽圆角矩形节点、按列对齐、直角折线连线（可选贝塞尔）、左半区徽标在左/右半区在右
 - 双方向：`orientation: 'horizontal'`（左右分侧，默认）或 `'vertical'`（上下分侧，水平布局的坐标转置；兄弟间距按节点宽度自适应防叠边）
 - 折叠展开：对齐官方 [collapsible-tree](https://observablehq.com/@d3/collapsible-tree)（250ms 过渡，子树自点击处长出/回拢），节点本体与 +/− 徽标均可点击
-- 懒加载聚合：子节点超限聚合为"展开 (N)"分批释放，`loadChildren` 异步回调缝可接远程 API
+- 懒加载下一级：子节点超限聚合为"展开 (N)"分批释放；`hasChildren` 标记的节点点击展开时按"本地是否有下一级"自动决定是否请求 `loadChildren` 异步回调（可接远程 API）
 - 缩放平移 + `zoomToFit`；分组着色 + tooltip + 图例筛选；搜索高亮定位（含祖先链）；导出 PNG/SVG；编程式增删节点
 - 主题与文案可配：`theme` 浅合并覆盖任意视觉字段（背景/节点/连线/徽标/调色板），`texts` 国际化内置文案
 - 可访问性基线：节点键盘可操作（Enter/Space）、ARIA role/label/expanded、响应系统"减少动态效果"偏好
@@ -122,6 +122,7 @@ interface TreeNodeData {
   group?: string                      // 分组：着色 / 图例筛选 / 搜索
   side?: 'left' | 'right'             // 仅根的直接子节点生效；缺省按数量均分
   collapsed?: boolean                 // 初始折叠态
+  hasChildren?: boolean               // 标记"下一级未加载"：展示 + 徽标，点击展开触发 loadChildren 请求
   properties?: Record<string, string | number | boolean | null>  // tooltip 详情
   children?: TreeNodeData[]
 }
@@ -145,7 +146,7 @@ interface TreeNodeData {
 | `colorByGroup` | `boolean` / `false` | 按 group 调色板着色（白字） |
 | `nodeColor` | `(node) => string` | 自定义节点填充，优先于分组色 |
 | `tooltip.formatter` | `(node) => string` | tooltip HTML 内容（默认名称 + properties 键值表，自动转义） |
-| `loadChildren` | `(parent) => Promise<TreeNodeData[]>` | 点击"展开 (N)"时异步拉取子节点并入数据 |
+| `loadChildren` | `(parent) => Promise<TreeNodeData[]>` | 异步拉取子节点并入数据；触发时机：点击"展开 (N)"聚合，或展开 `hasChildren` 标记节点（本地已有下一级则不请求，直接本地切换） |
 | `onLoadError` | `(error, parent) => void` | loadChildren 拉取失败回调；缺省仅静默复位 loading 态 |
 | `theme` | `Partial<Theme>` / 内置主题 | 主题定制：浅合并覆盖背景、节点、连线、徽标、调色板等任意字段 |
 | `texts` | `TreeTexts` / 中文 | 内置文案定制（聚合"展开 (N)"、徽标悬停提示），用于国际化 |

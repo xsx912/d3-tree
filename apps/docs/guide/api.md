@@ -29,7 +29,7 @@ function createBidirectionalTree(container: HTMLElement, options: TreeOptions): 
 | `nodeRenderer` | `(ctx) => void` | SVG 自定义节点渲染（导出无损） |
 | `nodeTemplate` | `(data, variant) => string \| HTMLElement` | HTML 模板渲染进 foreignObject |
 | `tooltip.formatter` | `(node) => string` | tooltip HTML（默认名称 + properties 键值表，自动转义） |
-| `loadChildren` | `(parent) => Promise<TreeNodeData[]>` | 点击「展开 (N)」时异步拉取并入数据 |
+| `loadChildren` | `(parent) => Promise<TreeNodeData[]>` | 异步拉取并入数据；触发：点击「展开 (N)」聚合，或展开 `hasChildren` 标记节点（本地已有下一级则不请求） |
 | `onLoadError` | `(error, parent) => void` | loadChildren 拉取失败回调；缺省仅静默复位 loading 态 |
 | `theme` | `Partial<Theme>` | 主题定制：浅合并到内置主题（背景/节点色/连线色/徽标/调色板等任意字段） |
 | `texts` | `TreeTexts` | 内置文案定制（聚合节点/徽标提示），用于国际化；缺省中文，见 [TreeTexts](#treetexts) |
@@ -63,6 +63,7 @@ interface TreeTexts {
   aggregateLabel?: (remaining: number) => string
   badgeExpandTitle?: (descendantCount: number) => string  // 徽标悬停提示：收起态
   badgeCollapseTitle?: (descendantCount: number) => string // 徽标悬停提示：展开态
+  badgeLazyExpandTitle?: () => string  // 徽标悬停提示：hasChildren 未加载
 }
 
 // 英文示例

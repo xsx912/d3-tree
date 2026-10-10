@@ -564,19 +564,60 @@ export function createBidirectionalTree(
   /** 官方 collapsible-tree 模式：翻转折叠态后以被点击节点为动画源重绘 */
   function toggleById(id: string): void {
     if (id === currentData.id) return
+    if (loadingKeys.has(id)) return // 懒加载进行中：忽略重复触发
     const dataNode = findDataById(currentData, id)
-    if (!dataNode || !dataNode.children?.length) return
+    if (!dataNode) return
+    // 首次展开"存在未加载下一级"的节点：经 loadChildren 异步拉取（有下一级则走本地切换）
+    if (dataNode.hasChildren && !dataNode.children?.length) {
+      expandLazy(dataNode)
+      return
+    }
+    if (!dataNode.children?.length) return
     if (collapsedIds.has(id)) collapsedIds.delete(id)
     else collapsedIds.add(id)
     options.onNodeToggle?.(dataNode, collapsedIds.has(id))
     render(id)
   }
 
-  function setAggLoading(aggKey: string, loading: boolean): void {
+  /** 懒展开：拉取"下一级"并入后展开；空结果视为末级叶子并清除 hasChildren 标记 */
+  function expandLazy(node: TreeNodeData): void {
+    const loader = options.loadChildren
+    if (!loader) return
+    setLoading(node.id, true)
+    loader(node)
+      .then(fetched => {
+        if (destroyed) return
+        const existing = new Set((node.children ?? []).map(c => c.id))
+        node.children = [...(node.children ?? [])]
+        for (const child of fetched) {
+          if (!existing.has(child.id)) node.children!.push(child)
+        }
+        if (!node.children!.length) {
+          delete node.hasChildren // 末级：回归叶子展示
+        } else {
+          collapsedIds.delete(node.id)
+          options.onNodeToggle?.(node, false)
+        }
+        setLoading(node.id, false)
+        render(node.id)
+      })
+      .catch((error: unknown) => {
+        if (destroyed) return
+        setLoading(node.id, false)
+        options.onLoadError?.(error, node)
+      })
+  }
+
+  /** 加载进行中的 key（聚合节点 key 或节点 id）：驱动 d3t-loading 态并防止重复请求 */
+  const loadingKeys = new Set<string>()
+
+  function setLoading(key: string, loading: boolean): void {
     gNode
       .selectAll<SVGGElement, LayoutNode>('g.d3t-node')
-      .filter(n => n.key === aggKey)
+      .filter(n => n.key === key)
       .classed('d3t-loading', loading)
+    if (loading) loadingKeys.add(key)
+    else loadingKeys.delete(key)
   }
 
   /** 点击“展开 (N)”：本地数据分批释放；配置 loadChildren 时先异步拉取并入 */
@@ -586,7 +627,8 @@ export function createBidirectionalTree(
     const loader = options.loadChildren
     if (loader) {
       const aggKey = `__agg__${parentId}`
-      setAggLoading(aggKey, true)
+      if (loadingKeys.has(aggKey)) return // 加载中：忽略重复触发
+      setLoading(aggKey, true)
       loader(parent)
         .then(fetched => {
           if (destroyed) return
@@ -600,12 +642,12 @@ export function createBidirectionalTree(
             parentId,
             Math.max(0, parent.children!.length - visibleChildrenLimit),
           )
-          setAggLoading(aggKey, false)
+          setLoading(aggKey, false)
           render(parentId)
         })
         .catch((error: unknown) => {
           if (destroyed) return
-          setAggLoading(aggKey, false)
+          setLoading(aggKey, false)
           options.onLoadError?.(error, parent)
         })
       return
@@ -838,19 +880,24 @@ export function createBidirectionalTree(
     }
 
     // 徽标状态刷新：可见性、+/− 符号、悬停提示（后代数）；节点展开态同步到 aria-expanded
-    nodeMerged.attr('aria-expanded', d =>
-      d.data.children?.length ? String(!collapsedIds.has(d.key)) : null,
-    )
+    nodeMerged.attr('aria-expanded', d => {
+      const unloaded = d.data.hasChildren === true && !d.data.children?.length
+      if (unloaded) return 'false'
+      return d.data.children?.length ? String(!collapsedIds.has(d.key)) : null
+    })
     nodeMerged.select<SVGGElement>('g.d3t-badge').each(function (d) {
       const g = select(this)
-      const hasChildren = !!d.data.children?.length
-      g.style('display', hasChildren ? '' : 'none')
-      g.select<SVGTextElement>('text.d3t-badge-symbol').text(collapsedIds.has(d.key) ? '+' : '−')
+      const unloaded = d.data.hasChildren === true && !d.data.children?.length
+      const expanded = !!d.data.children?.length && !collapsedIds.has(d.key)
+      g.style('display', d.data.children?.length || unloaded ? '' : 'none')
+      g.select<SVGTextElement>('text.d3t-badge-symbol').text(expanded ? '−' : '+')
       const n = countDescendants(d.data)
       g.select('title').text(
-        collapsedIds.has(d.key)
-          ? (texts?.badgeExpandTitle?.(n) ?? `展开（含 ${n} 个后代节点）`)
-          : (texts?.badgeCollapseTitle?.(n) ?? `收起（含 ${n} 个后代节点）`),
+        unloaded
+          ? (texts?.badgeLazyExpandTitle?.() ?? '展开（下一级需从数据源加载）')
+          : expanded
+            ? (texts?.badgeCollapseTitle?.(n) ?? `收起（含 ${n} 个后代节点）`)
+            : (texts?.badgeExpandTitle?.(n) ?? `展开（含 ${n} 个后代节点）`),
       )
     })
 
