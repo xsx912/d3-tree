@@ -375,6 +375,17 @@ export function createBidirectionalTree(
   // 弹窗可交互：移入取消待隐藏，移出后同样防抖隐藏
   tooltipEl.addEventListener('mouseenter', cancelTooltipHide)
   tooltipEl.addEventListener('mouseleave', scheduleTooltipHide)
+  // 异步内容替换/字体图片晚到会改变悬浮层尺寸，导致锚定位置漂移压节点——两条互补重算路径：
+  // · MutationObserver：内容替换（DOM 变化）即重算，microtask 派发不依赖渲染循环
+  // · ResizeObserver：纯尺寸变化（字体/图片加载撑高，DOM 不变）时兜底
+  // 隐藏期 positionTooltip 有守卫直接返回，两者幂等（不监听 attributes，避免写 left/top 自触发）
+  const tooltipMutationObserver = new MutationObserver(() => positionTooltip())
+  tooltipMutationObserver.observe(tooltipEl, { childList: true, subtree: true, characterData: true })
+  let tooltipResizeObserver: ResizeObserver | null = null
+  if (typeof ResizeObserver === 'function') {
+    tooltipResizeObserver = new ResizeObserver(() => positionTooltip())
+    tooltipResizeObserver.observe(tooltipEl)
+  }
 
   // ---- 高亮/淡化样式注入 ----
   const styleEl = document.createElement('style')
@@ -1172,6 +1183,8 @@ export function createBidirectionalTree(
     destroy() {
       destroyed = true
       resizeObserver?.disconnect()
+      tooltipMutationObserver.disconnect()
+      tooltipResizeObserver?.disconnect()
       svg.remove()
       tooltipEl.remove()
       cancelAnimationFrame(tooltipRafId)

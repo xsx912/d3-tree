@@ -28,7 +28,7 @@ function createBidirectionalTree(container: HTMLElement, options: TreeOptions): 
 | `nodeSize` | `(data, variant) => { width, height }` | 节点几何完全接管 |
 | `nodeRenderer` | `(ctx) => void` | SVG 自定义节点渲染（导出无损） |
 | `nodeTemplate` | `(data, variant) => string \| HTMLElement` | HTML 模板渲染进 foreignObject |
-| `tooltip.formatter` | `(node, ctx) => string \| HTMLElement` | 悬浮框内容：HTML 字符串或 DOM 元素（可承载组件宿主）；默认名称 + properties 键值表（自动转义）；ctx 见 [TooltipContext](#tooltipcontext)。悬浮框**锚定节点**（外侧、边缘翻转、随缩放平移跟随），不随光标移动；内容**可交互**：移入弹窗不隐藏（可点击按钮/链接），移出节点或弹窗后约 150ms 防抖隐藏 |
+| `tooltip.formatter` | `(node, ctx) => string \| HTMLElement` | 悬浮框内容：HTML 字符串或 DOM 元素（可承载组件宿主）；默认名称 + properties 键值表（自动转义）；ctx 见 [TooltipContext](#tooltipcontext)。悬浮框**锚定节点**（外侧、边缘翻转、随缩放平移跟随），不随光标移动；内容替换或尺寸变化（异步数据、字体/图片加载）自动重算位置；内容**可交互**：移入弹窗不隐藏（可点击按钮/链接），移出节点或弹窗后约 150ms 防抖隐藏 |
 | `tooltip.className` | `string` | 追加到悬浮层的 class（内置外壳保留，覆盖内联样式需 `!important`） |
 | `tooltip.hideDelay` | `number` / `150` | 移出节点/弹窗后的防抖隐藏延时（毫秒）：期间移入弹窗取消隐藏；`0` 移出即藏（仍走淡出） |
 | `tooltip.fadeDuration` | `number` / `150` | 显示/隐藏淡入淡出时长（毫秒，`0` 关闭过渡）；"减少动态效果"偏好下未显式配置时为 0；淡出完成才隐藏并触发 `onTooltipHide` |

@@ -69,6 +69,30 @@ async function settleHide(): Promise<void> {
   await sleep(HIDE_DELAY + FADE_DURATION + 60)
 }
 
+/** jsdom 无 ResizeObserver：最小 fake，测试里手动 trigger 模拟内容尺寸变化通知 */
+class FakeResizeObserver {
+  static instances: FakeResizeObserver[] = []
+  private callback: () => void
+  observed: Element[] = []
+  constructor(callback: () => void) {
+    this.callback = callback
+    FakeResizeObserver.instances.push(this)
+  }
+  observe(el: Element): void {
+    this.observed.push(el)
+  }
+  unobserve(el: Element): void {
+    this.observed = this.observed.filter(e => e !== el)
+  }
+  disconnect(): void {
+    this.observed = []
+  }
+  /** 对齐浏览器语义：已断开（无观察目标）的 observer 不再通知 */
+  trigger(): void {
+    if (this.observed.length > 0) this.callback()
+  }
+}
+
 describe('悬浮框自定义内容（formatter 组件化）', () => {
   it('formatter 收到节点数据与上下文：depth/side/collapsed', () => {
     const formatter = vi.fn((_node: TreeNodeData, _ctx: TooltipContext) => 'x')
@@ -481,6 +505,81 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
         a.dispatchEvent(new MouseEvent('mouseleave'))
         await sleep(HIDE_DELAY + 80) // 防抖到期即隐藏，无淡出等待
         expect(tip.style.display).toBe('none')
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+  })
+
+  describe('内容尺寸变化后重定位（异步详情撑高悬浮层）', () => {
+    it('异步内容撑高后按新尺寸重算锚定位置（不再压到节点）', () => {
+      FakeResizeObserver.instances = []
+      vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+      try {
+        const card = document.createElement('div')
+        card.textContent = '骨架'
+        const { container } = mount(fixture(), { tooltip: { formatter: () => card } })
+
+        const tip = tooltipEl(container)
+        // jsdom 无布局：stub 悬浮层高度，模拟骨架屏（40px）→ 详情（120px）
+        let height = 40
+        Object.defineProperty(tip, 'offsetHeight', { get: () => height, configurable: true })
+
+        const a = nodeById(container, 'a')
+        hover(a)
+        const top1 = parseFloat(tip.style.top) // 骨架期定位：cy - 40/2
+
+        height = 120
+        card.textContent = '详情多行内容'
+        const ro = FakeResizeObserver.instances.find(r => r.observed.includes(tip))
+        expect(ro, '应创建 ResizeObserver 监听悬浮层').toBeTruthy()
+        ro!.trigger() // 模拟浏览器通知：内容尺寸变化
+
+        // 重算：垂直居中随新高度上移 40px（(120-40)/2），否则卡片下坠/压节点
+        expect(parseFloat(tip.style.top)).toBeCloseTo(top1 - 40, 5)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+
+    it('内容替换（DOM 变化）即重算——不依赖渲染循环的兜底路径', async () => {
+      // 不 stub ResizeObserver（jsdom 无，core RO 分支跳过）：仅 MutationObserver 生效
+      const card = document.createElement('div')
+      card.textContent = '骨架'
+      const { container } = mount(fixture(), { tooltip: { formatter: () => card } })
+      const tip = tooltipEl(container)
+      let height = 40
+      Object.defineProperty(tip, 'offsetHeight', { get: () => height, configurable: true })
+
+      const a = nodeById(container, 'a')
+      hover(a)
+      const top1 = parseFloat(tip.style.top)
+
+      height = 120
+      card.textContent = '详情多行内容' // 异步数据到达的内容替换（microtask 通知）
+      await sleep(30)
+
+      expect(parseFloat(tip.style.top)).toBeCloseTo(top1 - 40, 5)
+    })
+
+    it('destroy 后断开监听（不再重定位）', () => {
+      FakeResizeObserver.instances = []
+      vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+      try {
+        const { container, tree } = mount(fixture())
+        const tip = tooltipEl(container)
+        hover(nodeById(container, 'a'))
+        const before = tip.style.top
+
+        const ro = FakeResizeObserver.instances.find(r => r.observed.includes(tip))
+        expect(ro, '悬浮层监听应存在').toBeTruthy()
+        tree.destroy()
+        expect(ro!.observed).toHaveLength(0) // disconnect 清空观察目标
+
+        let height = 120
+        Object.defineProperty(tip, 'offsetHeight', { get: () => height, configurable: true })
+        ro!.trigger() // 已断开：不再通知，位置保持
+        expect(tip.style.top).toBe(before)
       } finally {
         vi.unstubAllGlobals()
       }
