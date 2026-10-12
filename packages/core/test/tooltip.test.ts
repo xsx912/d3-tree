@@ -280,4 +280,41 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
       expect(parseFloat(tip.style.top)).toBeCloseTo(300 + box.y + box.height / 2 + 12, 5)
     })
   })
+
+  describe('onTooltipHide 回调（封装层卸载时机的缝）', () => {
+    it('移出节点时触发', () => {
+      const onTooltipHide = vi.fn()
+      const { container } = mount(fixture(), { tooltip: { onTooltipHide } })
+
+      const a = nodeById(container, 'a')
+      hover(a)
+      expect(onTooltipHide).not.toHaveBeenCalled()
+
+      a.dispatchEvent(new MouseEvent('mouseleave'))
+      expect(onTooltipHide).toHaveBeenCalledTimes(1)
+    })
+
+    it('重渲染隐藏悬浮层时触发（如折叠切换）', () => {
+      const onTooltipHide = vi.fn()
+      const { container, tree } = mount(fixture(), { tooltip: { onTooltipHide } })
+
+      const a = nodeById(container, 'a')
+      hover(a)
+      tree.toggle('a') // render() 末尾 hideTooltip()
+
+      expect(onTooltipHide).toHaveBeenCalledTimes(1)
+    })
+
+    it('换节点直切不经过隐藏（不触发），destroy 也不触发（封装层自管卸载）', () => {
+      const onTooltipHide = vi.fn()
+      const { container, tree } = mount(fixture(), { tooltip: { onTooltipHide } })
+
+      hover(nodeById(container, 'a'))
+      hover(nodeById(container, 'b')) // mouseenter 直切：无 hide
+      expect(onTooltipHide).not.toHaveBeenCalled()
+
+      tree.destroy()
+      expect(onTooltipHide).not.toHaveBeenCalled()
+    })
+  })
 })

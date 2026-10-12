@@ -99,6 +99,12 @@ export const BidirectionalTree = defineComponent({
       default: undefined,
     },
     tooltipClassName: { type: String, default: undefined },
+    /**
+     * 是否缓存悬浮框内容组件实例（#tooltip 插槽模式）：默认 true 单实例常驻复用
+     * （hover 只更新 props，移出仅隐藏）；false 每次悬停全新挂载、隐藏即卸载——
+     * 组件状态不跨悬停留、onUnmounted 即时触发。
+     */
+    tooltipCache: { type: Boolean, default: true },
     loadChildren: {
       type: Function as PropType<(parent: TreeNodeData) => Promise<TreeNodeData[]>>,
       default: undefined,
@@ -140,8 +146,15 @@ export const BidirectionalTree = defineComponent({
       },
     })
 
+    /** 卸载插槽内容（幂等）：关闭实例缓存时的隐藏卸载；不缓存模式下 show 前清场 */
+    function unmountTooltipSlot(): void {
+      if (tooltipHostEl) render(null, tooltipHostEl)
+    }
+
     function renderTooltipSlot(node: TreeNodeData, ctx: TooltipContext): HTMLElement {
       if (!tooltipHostEl) tooltipHostEl = document.createElement('div')
+      // 不缓存：先卸载旧实例（幂等；换节点直切时也保证全新挂载）
+      if (props.tooltipCache === false) unmountTooltipSlot()
       const vnode = h(TooltipSlotHost, { node, ctx })
       // 命令式 render 脱离父组件树：携带 appContext 保留 provide/inject 与全局注册
       if (instance) vnode.appContext = instance.appContext
@@ -173,6 +186,9 @@ export const BidirectionalTree = defineComponent({
               // 插槽优先于 tooltipFormatter（更富的表达）；两者都返回元素给 core 挂载
               formatter: slots.tooltip ? renderTooltipSlot : props.tooltipFormatter ?? undefined,
               className: props.tooltipClassName ?? undefined,
+              // 关闭实例缓存：隐藏即卸载插槽内容（换节点直切由 formatter 内先卸载保证）
+              onTooltipHide:
+                slots.tooltip && props.tooltipCache === false ? unmountTooltipSlot : undefined,
             }
           : undefined,
         loadChildren: props.loadChildren ?? undefined,
@@ -240,6 +256,7 @@ export const BidirectionalTree = defineComponent({
         props.nodeTemplate,
         props.tooltipFormatter,
         props.tooltipClassName,
+        props.tooltipCache,
         props.loadChildren,
         props.measureText,
         props.theme,

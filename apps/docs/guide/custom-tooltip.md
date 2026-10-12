@@ -99,6 +99,19 @@ const renderTooltip = useCallback(
 
 注意两点：函数身份变化会销毁重建整树（建议 `useCallback`）；返回树的根组件类型保持稳定（一直渲染 `NodeCard`）才能复用实例。`renderTooltip` 优先于 `tooltipFormatter`。react-dom 是 `@d3-tree/react` 的 peerDependency。
 
+## 状态隔离：关闭实例缓存
+
+默认（`tooltip-cache` / `tooltipCache` 为 `true`）内容组件**单实例常驻复用**：hover 只更新 props、移出仅隐藏，性能最优。若组件依赖 setup 重新执行（入场动画、独立状态），或希望状态不跨悬停留、卸载即时触发，传 `false` 关闭缓存——**每次悬停全新挂载，移出/换节点即卸载**：
+
+```vue
+<!-- 关闭缓存：每次悬停全新挂载、隐藏即卸载（onUnmounted 即时触发） -->
+<BidirectionalTree :data="data" :tooltip-cache="false">
+  <template #tooltip="{ node, ctx }">…</template>
+</BidirectionalTree>
+```
+
+React 同理：`<BidirectionalTree renderTooltip={renderTooltip} tooltipCache={false} />`（effect cleanup 即时触发）。底层实现：core 的 `tooltip.onTooltipHide` 回调在悬浮层隐藏（移出/重渲染）时通知封装层卸载；纯 core 用户返回元素时可自行挂这个回调做清理。
+
 ## 异步内容：拉取 + 缓存 + 过期丢弃
 
 单实例常驻后，异步详情放在插槽/render-prop 的**根组件**里最自然：`watch/useEffect` 监听节点 id → 拉取 → 命中缓存秒出；过期响应丢弃（Vue 用序号守卫，React 用 effect cleanup 的 stale 标记，真实业务可用 AbortController）：

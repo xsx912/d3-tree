@@ -30,6 +30,7 @@ function createBidirectionalTree(container: HTMLElement, options: TreeOptions): 
 | `nodeTemplate` | `(data, variant) => string \| HTMLElement` | HTML 模板渲染进 foreignObject |
 | `tooltip.formatter` | `(node, ctx) => string \| HTMLElement` | 悬浮框内容：HTML 字符串或 DOM 元素（可承载组件宿主）；默认名称 + properties 键值表（自动转义）；ctx 见 [TooltipContext](#tooltipcontext)。悬浮框**锚定节点**（外侧、边缘翻转、随缩放平移跟随），不随光标移动 |
 | `tooltip.className` | `string` | 追加到悬浮层的 class（内置外壳保留，覆盖内联样式需 `!important`） |
+| `tooltip.onTooltipHide` | `() => void` | 悬浮层隐藏时回调（移出/重渲染；destroy 不触发）——封装层用它实现关闭实例缓存后移出即卸载 |
 | `loadChildren` | `(parent) => Promise<TreeNodeData[]>` | 异步拉取并入数据；触发：点击「展开 (N)」聚合，或展开 `hasChildren` 标记节点（本地已有下一级则不请求） |
 | `onLoadError` | `(error, parent) => void` | loadChildren 拉取失败回调；缺省仅静默复位 loading 态 |
 | `theme` | `Partial<Theme>` | 主题定制：浅合并到内置主题（背景/节点色/连线色/徽标/调色板等任意字段） |

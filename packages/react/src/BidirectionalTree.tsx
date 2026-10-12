@@ -52,6 +52,12 @@ export interface BidirectionalTreeProps {
   renderTooltip?: (node: TreeNodeData, ctx: TooltipContext) => ReactNode
   /** 追加到悬浮层的 class（内置外壳保留） */
   tooltipClassName?: string
+  /**
+   * 是否缓存悬浮框内容组件实例（renderTooltip 模式）：默认 true 单实例常驻复用
+   * （hover 只重渲染，移出仅隐藏）；false 每次悬停全新挂载、隐藏即卸载——
+   * 组件状态不跨悬停留、effect cleanup 即时触发。
+   */
+  tooltipCache?: boolean
   loadChildren?: (parent: TreeNodeData) => Promise<TreeNodeData[]>
   onLoadError?: (error: unknown, parent: TreeNodeData) => void
   /** 主题定制：浅合并到内置主题 */
@@ -98,6 +104,13 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
     const optionsRef = useRef<TreeOptions | null>(null)
     // 悬浮内容的常驻宿主（renderTooltip 用）：createRoot 单实例，hover 只重渲染
     const tooltipLayerRef = useRef<{ host: HTMLDivElement; root: Root } | null>(null)
+    // 卸载悬浮内容（幂等）：关闭实例缓存时的隐藏卸载；不缓存模式下 show 前清场
+    const unmountTooltipLayer = (): void => {
+      if (tooltipLayerRef.current) {
+        tooltipLayerRef.current.root.unmount()
+        tooltipLayerRef.current = null
+      }
+    }
     // 最新 props 引用：事件回调始终读到最新，避免因回调变化重建实例
     const propsRef = useRef(props)
     propsRef.current = props
@@ -122,6 +135,7 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       tooltipFormatter,
       renderTooltip,
       tooltipClassName,
+      tooltipCache,
       loadChildren,
       toggleOnNodeClick,
       measureText,
@@ -153,6 +167,8 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
                 // render-prop 优先于 tooltipFormatter（更富的表达）
                 formatter: renderTooltip
                   ? (node, ctx) => {
+                      // 关闭缓存：卸载旧 root（幂等；换节点直切时也保证全新挂载）
+                      if (tooltipCache === false) unmountTooltipLayer()
                       // 常驻宿主 + createRoot：hover 只重渲染（root 类型稳定即复用实例）
                       let layer = tooltipLayerRef.current
                       if (!layer) {
@@ -165,6 +181,9 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
                     }
                   : tooltipFormatter ?? undefined,
                 className: tooltipClassName ?? undefined,
+                // 关闭实例缓存：隐藏即卸载内容组件
+                onTooltipHide:
+                  renderTooltip && tooltipCache === false ? unmountTooltipLayer : undefined,
               }
             : undefined,
         loadChildren,
@@ -210,6 +229,7 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       tooltipFormatter,
       renderTooltip,
       tooltipClassName,
+      tooltipCache,
       loadChildren,
       toggleOnNodeClick,
       measureText,

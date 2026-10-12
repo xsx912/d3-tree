@@ -302,9 +302,11 @@ export function createBidirectionalTree(
   }
 
   function hideTooltip(): void {
+    if (tooltipEl.style.display === 'none') return // 已隐藏不重复回调
     tooltipEl.style.display = 'none'
     tooltipAnchor = null
     cancelAnimationFrame(tooltipRafId)
+    options.tooltip?.onTooltipHide?.()
   }
 
   // ---- 高亮/淡化样式注入 ----

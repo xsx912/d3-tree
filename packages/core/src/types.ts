@@ -113,6 +113,11 @@ export interface TooltipOptions {
   formatter?: (node: TreeNodeData, ctx: TooltipContext) => string | HTMLElement
   /** 追加到悬浮层的 class（内置外壳样式保留，可用 CSS 覆盖） */
   className?: string
+  /**
+   * 悬浮层隐藏时回调（鼠标移出、重渲染隐藏；destroy 不触发，由调用端自管清理）。
+   * 封装层用它实现"关闭实例缓存后移出即卸载内容组件"。
+   */
+  onTooltipHide?: () => void
 }
 
 /** 内置文案定制（缺省中文）：聚合节点与徽标悬停提示，供国际化替换 */
