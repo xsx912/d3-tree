@@ -585,4 +585,110 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
       }
     })
   })
+
+  describe('悬停事件缝（自接管悬浮框：配置 onNodeHover 即停用内置）', () => {
+    it('悬停触发 onNodeHover：ctx 含 depth/side/collapsed/element/aggregate', () => {
+      const onNodeHover = vi.fn()
+      const { container } = mount(fixture(), { onNodeHover })
+
+      hover(nodeById(container, 'a'))
+
+      expect(onNodeHover).toHaveBeenCalledTimes(1)
+      const [node, ctx] = onNodeHover.mock.calls[0]!
+      expect(node.id).toBe('a')
+      expect(ctx.depth).toBe(1)
+      expect(ctx.side).toBe('left')
+      expect(ctx.collapsed).toBe(false)
+      expect(ctx.element).toBe(nodeById(container, 'a')) // 节点 g 元素引用
+      expect(ctx.aggregate).toBe(false)
+    })
+
+    it('配置即禁内置：悬停后内置悬浮层保持隐藏', () => {
+      const onNodeHover = vi.fn()
+      const { container } = mount(fixture(), { onNodeHover })
+
+      hover(nodeById(container, 'a'))
+
+      expect(onNodeHover).toHaveBeenCalledTimes(1)
+      expect(tooltipEl(container).style.display).toBe('none')
+    })
+
+    it('聚合节点照发事件（aggregate: true，调用端自行区分）', () => {
+      const onNodeHover = vi.fn()
+      const data = fixture()
+      data.children![0]!.children!.push(
+        { id: 'a3', name: '甲三' },
+        { id: 'a4', name: '甲四' },
+      )
+      const { container } = mount(data, { onNodeHover, visibleChildrenLimit: 2 })
+
+      const agg = container.querySelector<SVGGElement>('g.d3t-node--aggregate')!
+      expect(agg, '聚合节点应存在').toBeTruthy()
+      hover(agg)
+
+      expect(onNodeHover).toHaveBeenCalledTimes(1)
+      expect(onNodeHover.mock.calls[0]![1].aggregate).toBe(true)
+    })
+
+    it('移出立即触发 onNodeHoverEnd（带最后悬停节点，无防抖延时）', () => {
+      const onNodeHoverEnd = vi.fn()
+      const { container } = mount(fixture(), { onNodeHover: vi.fn(), onNodeHoverEnd })
+
+      const a = nodeById(container, 'a')
+      hover(a)
+      a.dispatchEvent(new MouseEvent('mouseleave'))
+
+      expect(onNodeHoverEnd).toHaveBeenCalledTimes(1) // 同步触发
+      expect(onNodeHoverEnd.mock.calls[0]![0].id).toBe('a')
+    })
+
+    it('换节点直切（真实事件序 leave→enter）：先收前节点 end，再收新 hover', () => {
+      const onNodeHover = vi.fn()
+      const onNodeHoverEnd = vi.fn()
+      const { container } = mount(fixture(), { onNodeHover, onNodeHoverEnd })
+
+      const a = nodeById(container, 'a')
+      hover(a)
+      // 真实浏览器指针 A→B：mouseleave(A) 先于 mouseenter(B)——事件缝忠实转发该序列
+      a.dispatchEvent(new MouseEvent('mouseleave'))
+      hover(nodeById(container, 'b'))
+
+      expect(onNodeHover).toHaveBeenCalledTimes(2)
+      expect(onNodeHoverEnd).toHaveBeenCalledTimes(1)
+      expect(onNodeHoverEnd.mock.calls[0]![0].id).toBe('a')
+      expect(onNodeHover.mock.calls[1]![0].id).toBe('b')
+    })
+
+    it('重渲染（折叠切换）时触发 end——对齐内置"锚点失效即隐藏"语义', () => {
+      const onNodeHoverEnd = vi.fn()
+      const { container, tree } = mount(fixture(), { onNodeHover: vi.fn(), onNodeHoverEnd })
+
+      hover(nodeById(container, 'a'))
+      tree.toggle('a')
+
+      expect(onNodeHoverEnd).toHaveBeenCalledTimes(1)
+      expect(onNodeHoverEnd.mock.calls[0]![0].id).toBe('a')
+    })
+
+    it('destroy 不触发 end（对齐 onTooltipHide 先例）', () => {
+      const onNodeHoverEnd = vi.fn()
+      const { container, tree } = mount(fixture(), { onNodeHover: vi.fn(), onNodeHoverEnd })
+
+      hover(nodeById(container, 'a'))
+      tree.destroy()
+
+      expect(onNodeHoverEnd).not.toHaveBeenCalled()
+    })
+
+    it('内置模式 ctx 同样携带 element/aggregate（formatter 可用）', () => {
+      const formatter = vi.fn((_node: TreeNodeData, _ctx: TooltipContext) => 'x')
+      const { container } = mount(fixture(), { tooltip: { formatter } })
+
+      hover(nodeById(container, 'a'))
+
+      const [, ctx] = formatter.mock.calls[0]!
+      expect(ctx.element).toBe(nodeById(container, 'a'))
+      expect(ctx.aggregate).toBe(false)
+    })
+  })
 })

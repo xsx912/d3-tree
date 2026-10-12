@@ -261,6 +261,9 @@ export function createBidirectionalTree(
     }
   }
 
+  /** 自接管模式最近悬停的节点（end 事件带出；重渲染/移出时清空） */
+  let hoverLastNode: LayoutNode | null = null
+
   /** 真正隐藏（防抖与淡出完成后）：幂等，触发 onTooltipHide */
   function finalizeTooltipHide(): void {
     if (tooltipEl.style.display === 'none') return // 已隐藏不重复回调
@@ -287,16 +290,23 @@ export function createBidirectionalTree(
     }, tooltipHideDelay)
   }
 
-  function showTooltip(d: LayoutNode): void {
+  /** 悬停上下文（内置悬浮框与自接管事件共用）：视图状态 + 节点元素引用与聚合标记 */
+  function buildHoverCtx(d: LayoutNode, element: SVGGElement): TooltipContext {
+    return {
+      depth: d.depth,
+      side: d.side,
+      collapsed: collapsedIds.has(d.key),
+      element,
+      aggregate: d.variant === 'aggregate',
+    }
+  }
+
+  function showTooltip(d: LayoutNode, element: SVGGElement): void {
     if (d.variant === 'aggregate') return
     // 从隐藏翻开才需要淡入启动；节点间直切保持可见不重入场（淡出中断由 cancel 恢复）
     const wasHidden = tooltipEl.style.display === 'none'
     cancelTooltipHide()
-    const ctx: TooltipContext = {
-      depth: d.depth,
-      side: d.side,
-      collapsed: collapsedIds.has(d.key),
-    }
+    const ctx = buildHoverCtx(d, element)
     const content = options.tooltip?.formatter
       ? options.tooltip.formatter(d.data, ctx)
       : defaultTooltipHtml(d.data)
@@ -943,8 +953,24 @@ export function createBidirectionalTree(
           activateNode(event, d)
         }
       })
-      .on('mouseenter', (_event, d) => showTooltip(d))
-      .on('mouseleave', scheduleTooltipHide)
+      .on('mouseenter', function (_event, d) {
+        if (options.onNodeHover) {
+          // 自接管模式：只发事件，内置悬浮框停用
+          hoverLastNode = d
+          options.onNodeHover(d.data, buildHoverCtx(d, this))
+        } else {
+          showTooltip(d, this)
+        }
+      })
+      .on('mouseleave', function () {
+        if (options.onNodeHover) {
+          // 移出立即通知（无防抖：调用端完全自管，要防抖自行实现）
+          if (hoverLastNode) options.onNodeHoverEnd?.(hoverLastNode.data)
+          hoverLastNode = null
+        } else {
+          scheduleTooltipHide()
+        }
+      })
 
     if (customNodeRender) {
       nodeEnter.each(function (d) {
@@ -1063,6 +1089,11 @@ export function createBidirectionalTree(
         .text(d => d.name)
     }
 
+    // 自接管模式：重渲染后节点位置/存亡变化，对齐内置"锚点失效即隐藏"语义通知移出
+    if (options.onNodeHover && hoverLastNode) {
+      options.onNodeHoverEnd?.(hoverLastNode.data)
+      hoverLastNode = null
+    }
     hideTooltip()
 
     // 搜索态下重放高亮/淡化：折叠展开新进入的节点、增删后的节点也能获得正确的视觉状态
@@ -1189,6 +1220,7 @@ export function createBidirectionalTree(
       tooltipEl.remove()
       cancelAnimationFrame(tooltipRafId)
       cancelTooltipHide()
+      hoverLastNode = null // destroy 不发 end（对齐 onTooltipHide 先例，组件卸载自管清理）
       styleEl.remove()
     },
   }

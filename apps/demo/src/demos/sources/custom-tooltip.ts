@@ -87,6 +87,28 @@ export const customTooltipSources: DemoSources = {
       sync()
     }
     sync()
+
+    // ---- 完全自接管：不想用内置悬浮框时，把上面 tooltip 配置换成 onNodeHover/onNodeHoverEnd ----
+    // 配置即停用内置（外壳/锚定/防抖/淡入淡出全关），渲染定位全归调用端；
+    // ctx.element 是节点 g 引用（getBoundingClientRect 实时，可直接 anchor 给 floating-ui）。
+    // 完整可运行示例：
+    //
+    // const popover = document.createElement('div')
+    // popover.style.cssText = 'position:fixed;display:none;z-index:2000;background:#fff;' +
+    //   'border:2px solid #409EFF;border-radius:8px;padding:10px 14px;font-size:12px'
+    // document.body.appendChild(popover)
+    // const tree = createBidirectionalTree(el, {
+    //   data: industryData,
+    //   colorByGroup: true,
+    //   onNodeHover: (node, ctx) => {
+    //     const r = ctx.element.getBoundingClientRect() // 节点实时位置（缩放后自然跟随）
+    //     popover.innerHTML = '<b>' + node.name + (ctx.aggregate ? '（聚合）' : '') + '</b>'
+    //     popover.style.display = 'block'
+    //     popover.style.left = (ctx.side === 'left' ? r.right + 12 : r.left - popover.offsetWidth - 12) + 'px'
+    //     popover.style.top = (r.top + r.height / 2 - popover.offsetHeight / 2) + 'px'
+    //   },
+    //   onNodeHoverEnd: () => { popover.style.display = 'none' }, // 移出立即触发（要防抖自行实现）
+    // })
   </script>
 </body>
 </html>
@@ -177,6 +199,23 @@ onMounted(() => tree.value?.zoomToFit())
 /* tooltip.className 只是挂载点：覆盖内联外壳需 !important（如圆角/阴影）；非 scoped 才能命中悬浮层 */
 .biz-tip { border-radius: 10px !important; }
 </style>
+
+<!--
+  完全自接管：不想用内置悬浮框（含 #tooltip 插槽）时，去掉 tooltip 相关配置，
+  换成悬停事件（配置即停用内置，渲染定位全归调用端）：
+
+  <BidirectionalTree ref="tree" :data="industryData" color-by-group
+    @node-hover="onHover" @node-hover-end="onHoverEnd" />
+
+  const popover = ref<HTMLElement | null>(null) // 自己渲染的弹窗（如 Teleport 到 body）
+  function onHover(node: TreeNodeData, ctx: TooltipContext) {
+    const r = ctx.element.getBoundingClientRect() // 节点实时位置（缩放后自然跟随）
+    popoverState.value = { name: node.name, aggregate: ctx.aggregate, x: r.right + 12, y: r.top }
+  }
+  function onHoverEnd(node: TreeNodeData) {
+    popoverState.value = null // 移出立即触发（要防抖自行实现）
+  }
+-->
 `,
   react: `import { useCallback, useEffect, useRef, useState } from 'react'
 import { BidirectionalTree } from '@d3-tree/react'
@@ -264,5 +303,28 @@ export default function BidirectionalTreeDemo() {
     </div>
   )
 }
+
+// ---- 完全自接管：不想用内置悬浮框（含 renderTooltip）时，去掉 tooltip 相关配置，
+// 换成悬停事件（配置即停用内置，渲染定位全归调用端）：
+//
+// function App() {
+//   const [popover, setPopover] = useState<{ name: string; x: number; y: number } | null>(null)
+//   const onNodeHover = useCallback((node: TreeNodeData, ctx: TooltipContext) => {
+//     const r = ctx.element.getBoundingClientRect() // 节点实时位置（缩放后自然跟随）
+//     setPopover({ name: node.name + (ctx.aggregate ? '（聚合）' : ''), x: r.right + 12, y: r.top })
+//   }, [])
+//   const onNodeHoverEnd = useCallback(() => setPopover(null), []) // 移出立即触发
+//   return (
+//     <>
+//       <BidirectionalTree data={data} colorByGroup
+//         onNodeHover={onNodeHover} onNodeHoverEnd={onNodeHoverEnd} />
+//       {popover && (
+//         <div style={{ position: 'fixed', left: popover.x, top: popover.y, zIndex: 2000 }}>
+//           {popover.name}
+//         </div>
+//       )}
+//     </>
+//   )
+// }
 `,
 }

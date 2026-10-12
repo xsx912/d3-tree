@@ -122,6 +122,21 @@ export const BidirectionalTree = defineComponent({
     /** 内置文案定制（聚合节点/徽标提示），用于国际化 */
     texts: { type: Object as PropType<TreeTexts>, default: undefined },
     measureText: { type: Function as PropType<TextMeasurer>, default: undefined },
+    /**
+     * 悬停事件缝（自接管悬浮框）：配置后内置悬浮框整体停用（含 #tooltip 插槽），
+     * 悬停/移出由回调通知（ctx 含节点元素引用 element 与聚合标记 aggregate），
+     * 完全自行渲染定位。移出立即触发、直切只发新 hover、重渲染时触发 end。
+     * 模板两种写法等价：@node-hover="fn" / :on-node-hover="fn"。
+     */
+    onNodeHover: {
+      type: Function as PropType<(node: TreeNodeData, ctx: TooltipContext) => void>,
+      default: undefined,
+    },
+    /** 悬停移出回调（自接管模式）：参数为最后悬停的节点 */
+    onNodeHoverEnd: {
+      type: Function as PropType<(node: TreeNodeData) => void>,
+      default: undefined,
+    },
     /** 透传到宿主容器的类名与样式 */
     className: { type: String, default: undefined },
     style: { type: [String, Object, Array] as PropType<StyleValue>, default: undefined },
@@ -190,7 +205,8 @@ export const BidirectionalTree = defineComponent({
         nodeRenderer: props.nodeRenderer ?? undefined,
         nodeTemplate: props.nodeTemplate ?? undefined,
         nodeColor: props.nodeColor ?? undefined,
-        tooltip: hasTooltipConfig
+        // 自接管模式（@node-hover）优先：配置即停用内置悬浮框（含 #tooltip 插槽）
+        tooltip: hasTooltipConfig && !props.onNodeHover
           ? {
               // 插槽优先于 tooltipFormatter（更富的表达）；两者都返回元素给 core 挂载
               formatter: slots.tooltip ? renderTooltipSlot : props.tooltipFormatter ?? undefined,
@@ -211,6 +227,9 @@ export const BidirectionalTree = defineComponent({
         onNodeClick: node => emit('node-click', node),
         onNodeToggle: (node, collapsed) => emit('node-toggle', node, collapsed),
         onNodeSelect: node => emit('node-select', node),
+        // 悬停事件缝（自接管悬浮框）：透传（core 以是否配置判定模式；配置即停用内置）
+        onNodeHover: props.onNodeHover ?? undefined,
+        onNodeHoverEnd: props.onNodeHoverEnd ?? undefined,
         onGroupsChange: groups => emit('groups-change', groups),
       }
       chart = createBidirectionalTree(host.value, currentOptions)
@@ -270,6 +289,8 @@ export const BidirectionalTree = defineComponent({
         props.tooltipCache,
         props.tooltipHideDelay,
         props.tooltipFadeDuration,
+        props.onNodeHover,
+        props.onNodeHoverEnd,
         props.loadChildren,
         props.measureText,
         props.theme,

@@ -112,6 +112,29 @@ const renderTooltip = useCallback(
 
 React 同理：`<BidirectionalTree renderTooltip={renderTooltip} tooltipCache={false} />`（effect cleanup 即时触发）。底层实现：core 的 `tooltip.onTooltipHide` 回调在悬浮层隐藏（移出/重渲染）时通知封装层卸载；纯 core 用户返回元素时可自行挂这个回调做清理。
 
+## 完全自接管：悬停事件缝
+
+不想用内置悬浮框（外壳、锚定定位、防抖、淡入淡出整套）时，配置 `onNodeHover` 即**整体停用**，悬停与移出改由事件通知，弹窗的渲染与定位完全归调用端（如 floating-ui / radix popover，或简单的 fixed 定位卡片）：
+
+```ts
+const popover = document.createElement('div') // 自己的弹窗（挂 body、fixed 定位）
+document.body.appendChild(popover)
+
+createBidirectionalTree(el, {
+  data,
+  onNodeHover: (node, ctx) => {
+    const r = ctx.element.getBoundingClientRect() // 节点实时位置，缩放后自然跟随
+    popover.innerHTML = `<b>${node.name}</b>${ctx.aggregate ? '（聚合）' : ''}`
+    popover.style.display = 'block'
+    popover.style.left = `${ctx.side === 'left' ? r.right + 12 : r.left - popover.offsetWidth - 12}px`
+    popover.style.top = `${r.top + r.height / 2 - popover.offsetHeight / 2}px`
+  },
+  onNodeHoverEnd: node => { popover.style.display = 'none' },
+})
+```
+
+事件时序语义：事件**忠实转发浏览器序列**——移出立即触发 `onNodeHoverEnd(node)`（要防抖自行实现）；指针从 A 滑到相邻 B 时会先收 `end(A)` 再收 `hover(B)`（实现弹窗时"收 end 即隐藏、收 hover 即显示"即可正确切换）。折叠等重渲染时触发 `end`（锚点失效，对齐内置隐藏语义）；`destroy` 不触发（组件卸载时自行清理）。`onNodeHoverEnd` 需与 `onNodeHover` 成对配置。聚合节点**照发**事件（`ctx.aggregate` 区分）。`ctx.element` 是节点 SVG g 元素引用，`getBoundingClientRect()` 实时可取（缩放/平移后不过期），可直接作为 anchor 元素交给定位库。封装层用法：Vue `@node-hover` / `:on-node-hover`、React `onNodeHover` / `onNodeHoverEnd` props。
+
 ## 异步内容：拉取 + 缓存 + 过期丢弃
 
 单实例常驻后，异步详情放在插槽/render-prop 的**根组件**里最自然：`watch/useEffect` 监听节点 id → 拉取 → 命中缓存秒出；过期响应丢弃（Vue 用序号守卫，React 用 effect cleanup 的 stale 标记，真实业务可用 AbortController）：

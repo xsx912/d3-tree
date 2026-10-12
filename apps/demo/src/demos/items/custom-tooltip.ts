@@ -44,10 +44,11 @@ function buildCard(node: TreeNodeData, ctx: TooltipContext): HTMLElement {
 export const customTooltip: DemoItem = {
   id: 'custom-tooltip',
   title: '悬浮框内容自定义',
-  desc: 'tooltip.formatter 返回字符串或 DOM 元素（元素模式可承载组件宿主）；ctx 提供深度/侧别/收起态；tooltip.className 追加样式挂载点（内置外壳保留，可用 !important 覆盖）。',
+  desc: 'tooltip.formatter 返回字符串或 DOM 元素（元素模式可承载组件宿主）；ctx 提供深度/侧别/收起态/节点元素引用；tooltip.className 追加样式挂载点。配置 onNodeHover/onNodeHoverEnd 则完全自接管：内置悬浮框停用，悬停/移出由事件通知，弹窗渲染定位全归调用端。',
   setup({ canvas, overlay, setHint }) {
-    let mode: 'element' | 'string' = 'element'
-    const options: TreeOptions = {
+    type TipMode = 'element' | 'string' | 'self'
+    let mode: TipMode = 'element'
+    const builtInOptions = (): TreeOptions => ({
       data: industryData,
       colorByGroup: true,
       tooltip: {
@@ -58,8 +59,36 @@ export const customTooltip: DemoItem = {
             ? buildCard(node, ctx)
             : `<b>${node.name}</b><div style="color:#909399">深度 L${ctx.depth} · ${SIDE_NAMES[ctx.side]}</div>`,
       },
-    }
-    let tree: TreeInstance = createBidirectionalTree(canvas, options)
+    })
+    // 自接管模式：页面级独立弹窗（挂 body、fixed 定位贴节点元素），演示脱离库容器的完全接管
+    const popover = document.createElement('div')
+    popover.style.cssText =
+      'position:fixed;display:none;z-index:2000;background:#fff;border:2px solid #409EFF;' +
+      'border-radius:8px;padding:10px 14px;font-size:12px;line-height:1.8;' +
+      'box-shadow:0 4px 16px rgba(0,0,0,.16);pointer-events:none;max-width:260px'
+    document.body.appendChild(popover)
+    const selfOptions = (): TreeOptions => ({
+      data: industryData,
+      colorByGroup: true,
+      // 配置即停用内置悬浮框：只有事件，定位/防抖/显隐全由这里自己实现
+      onNodeHover: (node, ctx) => {
+        const r = ctx.element.getBoundingClientRect()
+        popover.innerHTML =
+          `<div style="font-weight:600;margin-bottom:4px">${node.name}${ctx.aggregate ? '（聚合节点）' : ''}</div>` +
+          `<div style="color:#409EFF">L${ctx.depth} · ${SIDE_NAMES[ctx.side]} · 完全自接管</div>`
+        popover.style.display = 'block'
+        const { offsetWidth: pw, offsetHeight: ph } = popover
+        // 左侧节点弹右侧、右侧/根弹左侧（element 实时 rect，缩放后自然跟随）
+        const left = ctx.side === 'left' ? r.right + 12 : r.left - pw - 12
+        popover.style.left = `${Math.max(8, left)}px`
+        popover.style.top = `${r.top + r.height / 2 - ph / 2}px`
+      },
+      onNodeHoverEnd: () => {
+        popover.style.display = 'none'
+      },
+    })
+
+    let tree: TreeInstance = createBidirectionalTree(canvas, builtInOptions())
     tree.zoomToFit()
 
     // className 只是挂载点：覆盖内联外壳需 !important（如圆角/阴影）
@@ -67,19 +96,38 @@ export const customTooltip: DemoItem = {
     styleEl.textContent = '.biz-tip { border-radius: 10px !important; }'
     canvas.appendChild(styleEl)
 
+    const MODE_NAMES: Record<TipMode, string> = {
+      element: 'DOM 元素卡片',
+      string: 'HTML 字符串',
+      self: '完全自接管',
+    }
     const btn = document.createElement('button')
     const sync = (): void => {
-      btn.textContent = `内容：${mode === 'element' ? 'DOM 元素卡片' : 'HTML 字符串'}`
-      setHint(`当前悬浮内容为${mode === 'element' ? 'DOM 元素（组件级自定义）' : 'HTML 字符串'}，悬停节点查看`)
+      btn.textContent = `内容：${MODE_NAMES[mode]}`
+      setHint(
+        mode === 'self'
+          ? 'onNodeHover 已配置：内置悬浮框停用，蓝色弹窗完全由页面渲染定位（悬停聚合节点也照发事件）'
+          : `当前悬浮内容为${mode === 'element' ? 'DOM 元素（组件级自定义）' : 'HTML 字符串'}，悬停节点查看`,
+      )
+    }
+    const rebuild = (): void => {
+      tree.destroy()
+      // 自接管与内置互斥（core 以 onNodeHover 是否配置判定），切换需重建实例
+      tree = createBidirectionalTree(canvas, mode === 'self' ? selfOptions() : builtInOptions())
+      tree.zoomToFit()
     }
     btn.onclick = () => {
-      mode = mode === 'element' ? 'string' : 'element'
+      const prev = mode
+      mode = mode === 'element' ? 'string' : mode === 'string' ? 'self' : 'element'
+      // 内置两态热切换无需重建；进出自接管态必须重建（互斥配置在创建时生效）
+      if (mode === 'self' || prev === 'self') rebuild()
       sync()
     }
     sync()
     overlay.appendChild(btn)
     return () => {
       tree.destroy()
+      popover.remove()
       styleEl.remove()
     }
   },

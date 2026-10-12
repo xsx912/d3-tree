@@ -157,6 +157,7 @@ interface TreeNodeData {
 | `toggleOnNodeClick` | `boolean` / `true` | `false` 时点击节点仅触发回调（编辑选取模式）；内置徽标、聚合节点与自定义节点中 `data-d3t-toggle` 标记区域仍可折叠 |
 | `measureText` | `(text, variant) => number` | 文本度量注入（测试确定性） |
 | `onNodeClick` / `onNodeToggle` / `onNodeSelect` / `onGroupsChange` | 回调 | 节点交互与图例数据事件 |
+| `onNodeHover` / `onNodeHoverEnd` | 回调 | 悬停事件缝（自接管悬浮框）：配置即停用内置悬浮框，渲染定位全归调用端（ctx 含节点元素引用与聚合标记）；Vue `@node-hover` / React `onNodeHover` |
 
 ## 实例方法
 

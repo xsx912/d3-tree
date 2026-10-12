@@ -97,6 +97,10 @@ export interface TooltipContext {
   side: Side | 'center'
   /** 节点当前是否处于收起态（本地子级已折叠不显示） */
   collapsed: boolean
+  /** 悬停节点的 SVG g 元素引用：getBoundingClientRect 实时可取（zoom 后不过期），可直接 anchor 给 floating-ui / radix 等弹窗库 */
+  element: SVGGElement
+  /** 是否「展开 (N)」聚合节点：内置悬浮框不显示聚合；自接管模式照发事件，可据此区分 */
+  aggregate: boolean
 }
 
 /**
@@ -203,6 +207,18 @@ export interface TreeOptions {
   onNodeToggle?: (node: TreeNodeData, collapsed: boolean) => void
   /** 任何非聚合节点被点击时广播（含根节点）；供选取/编辑流程使用 */
   onNodeSelect?: (node: TreeNodeData) => void
+  /**
+   * 悬停事件缝（自接管悬浮框）：配置后内置悬浮框整体停用（外壳/锚定/防抖/淡入淡出），
+   * 悬停与移出改由这两个回调通知，调用端完全自行渲染定位（如 floating-ui / radix）。
+   * 事件忠实转发浏览器序列：移出立即触发 end（无防抖，要防抖自行实现）；
+   * 换节点直切时先收前节点 end、再收新 hover（收 end 即隐藏、收 hover 即显示即可正确切换）；
+   * 重渲染时触发 end（锚点失效对齐内置隐藏语义）；destroy 不触发（组件卸载自管清理）。
+   * 聚合节点照发事件（ctx.aggregate 区分）。需与 onNodeHover 成对配置，
+   * 单独配置 onNodeHoverEnd 无效（模式由 onNodeHover 是否存在判定）。
+   */
+  onNodeHover?: (node: TreeNodeData, ctx: TooltipContext) => void
+  /** 悬停移出回调（自接管模式）：参数为最后悬停的节点；见 onNodeHover 的时序语义 */
+  onNodeHoverEnd?: (node: TreeNodeData) => void
   /**
    * 点击节点本体是否触发折叠切换，默认 true；置 false 后点击仅触发回调（编辑选取模式）。
    * 置 false 后仍可折叠的途径：内置 +/− 徽标、聚合节点，以及自定义节点内容中

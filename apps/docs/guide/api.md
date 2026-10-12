@@ -40,6 +40,7 @@ function createBidirectionalTree(container: HTMLElement, options: TreeOptions): 
 | `toggleOnNodeClick` | `boolean` / `true` | `false` 时点击节点仅触发回调（编辑选取模式）；内置徽标、聚合节点与 `data-d3t-toggle` 标记区域仍可折叠，见[自定义折叠触发区域](#自定义折叠触发区域data-d3t-toggle) |
 | `measureText` | `(text, variant) => number` | 文本度量注入（测试确定性） |
 | `onNodeClick` / `onNodeToggle` / `onNodeSelect` | 回调 | 节点点击 / 折叠切换 / 选取广播 |
+| `onNodeHover` / `onNodeHoverEnd` | 回调 | 悬停事件缝（**自接管悬浮框**）：配置 `onNodeHover` 即停用内置悬浮框（外壳/锚定/防抖/淡入淡出），悬停/移出由回调通知，渲染定位全归调用端；事件忠实转发浏览器序列（移出立即触发、直切时先收前节点 end 再收新 hover）、重渲染时触发 end、destroy 不触发；`onNodeHoverEnd` 需与 `onNodeHover` 成对配置。ctx 见 [TooltipContext](#tooltipcontext)（`element` 可直接 anchor 给 floating-ui / radix）；聚合节点照发（`aggregate` 区分）。详见[悬浮框自定义](/guide/custom-tooltip) |
 | `onGroupsChange` | `(groups: { name, color }[]) => void` | 分组集合变化（先于首帧触发） |
 
 ## 实例方法 TreeInstance
@@ -135,13 +136,15 @@ ctx.group.appendChild(btn)
 
 ## TooltipContext
 
-`tooltip.formatter` 收到的第二个参数（节点在当前视图中的位置与状态）：
+`tooltip.formatter` 与 `onNodeHover` 收到的第二个参数（节点在当前视图中的位置与状态）：
 
 ```ts
 interface TooltipContext {
   depth: number                     // 深度（根为 0）
   side: 'left' | 'right' | 'center'
   collapsed: boolean                // 本地子级已折叠不显示
+  element: SVGGElement              // 节点 g 元素引用（rect 实时可取，可 anchor 给弹窗库）
+  aggregate: boolean                // 是否「展开 (N)」聚合节点（内置悬浮框不显示；自接管照发）
 }
 ```
 

@@ -73,6 +73,14 @@ export interface BidirectionalTreeProps {
   onNodeClick?: (node: TreeNodeData) => void
   onNodeToggle?: (node: TreeNodeData, collapsed: boolean) => void
   onNodeSelect?: (node: TreeNodeData) => void
+  /**
+   * 悬停事件缝（自接管悬浮框）：配置后内置悬浮框整体停用，悬停/移出改由
+   * 这两个回调通知（ctx 含节点元素引用与 aggregate 标记），完全自行渲染定位。
+   * 移出立即触发、换节点直切只发新 hover、重渲染时触发 end、destroy 不触发。
+   */
+  onNodeHover?: (node: TreeNodeData, ctx: TooltipContext) => void
+  /** 悬停移出回调（自接管模式）：参数为最后悬停的节点 */
+  onNodeHoverEnd?: (node: TreeNodeData) => void
   onGroupsChange?: (groups: Array<{ name: string; color: string }>) => void
   className?: string
   style?: CSSProperties
@@ -144,6 +152,8 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       tooltipFadeDuration,
       loadChildren,
       toggleOnNodeClick,
+      onNodeHover,
+      onNodeHoverEnd,
       measureText,
       theme: themeOverride,
       texts,
@@ -172,7 +182,8 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
         nodeRenderer,
         nodeTemplate,
         nodeColor,
-        tooltip: hasTooltipConfig
+        // 自接管模式（onNodeHover）优先：配置即停用内置悬浮框（含 renderTooltip）
+        tooltip: hasTooltipConfig && !onNodeHover
             ? {
                 // render-prop 优先于 tooltipFormatter（更富的表达）
                 formatter: renderTooltip
@@ -207,6 +218,14 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
         onNodeClick: node => propsRef.current.onNodeClick?.(node),
         onNodeToggle: (node, collapsed) => propsRef.current.onNodeToggle?.(node, collapsed),
         onNodeSelect: node => propsRef.current.onNodeSelect?.(node),
+        // 悬停事件缝（自接管）：仅当调用端传入时启用（配置即停用内置悬浮框），
+        // 不能恒传包装函数——core 以 onNodeHover 是否存在判定模式
+        onNodeHover: onNodeHover
+          ? (node, ctx) => propsRef.current.onNodeHover?.(node, ctx)
+          : undefined,
+        onNodeHoverEnd: onNodeHoverEnd
+          ? (node) => propsRef.current.onNodeHoverEnd?.(node)
+          : undefined,
         onGroupsChange: groups => propsRef.current.onGroupsChange?.(groups),
       }
       optionsRef.current = options
@@ -244,6 +263,8 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       tooltipCache,
       tooltipHideDelay,
       tooltipFadeDuration,
+      onNodeHover,
+      onNodeHoverEnd,
       loadChildren,
       toggleOnNodeClick,
       measureText,
