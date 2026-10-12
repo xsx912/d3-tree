@@ -145,7 +145,7 @@ interface TreeNodeData {
 | `linkPathGenerator` | `(link) => string` | 完全自定义连线：返回 SVG path 的 d，优先于 linkStyle（不做形变插值） |
 | `colorByGroup` | `boolean` / `false` | 按 group 调色板着色（白字） |
 | `nodeColor` | `(node) => string` | 自定义节点填充，优先于分组色 |
-| `tooltip.formatter` | `(node, ctx) => string \| HTMLElement` | 悬浮框内容：HTML 字符串或 DOM 元素（可承载组件宿主）；默认名称 + properties 键值表（自动转义）；ctx 为 `{ depth, side, collapsed }`。悬浮框锚定节点（不随光标）；Vue 用 `#tooltip` 插槽、React 用 `renderTooltip` render-prop 可直接传组件（封装层托管单实例） |
+| `tooltip.formatter` | `(node, ctx) => string \| HTMLElement` | 悬浮框内容：HTML 字符串或 DOM 元素（可承载组件宿主）；默认名称 + properties 键值表（自动转义）；ctx 为 `{ depth, side, collapsed }`。悬浮框锚定节点（不随光标）、内容可交互（移入弹窗不消失，移出后约 150ms 防抖隐藏）；Vue 用 `#tooltip` 插槽、React 用 `renderTooltip` render-prop 可直接传组件（封装层托管单实例） |
 | `tooltip.className` | `string` | 追加到悬浮层的 class（内置外壳保留，覆盖内联样式需 `!important`） |
 | `tooltip.onTooltipHide` | `() => void` | 悬浮层隐藏时回调（移出/重渲染；destroy 不触发）。Vue `#tooltip` 插槽 / React `renderTooltip` 配 `tooltip-cache`/`tooltipCache: false` 可关闭内容组件实例缓存（每次悬停全新挂载、隐藏即卸载） |
 | `loadChildren` | `(parent) => Promise<TreeNodeData[]>` | 异步拉取子节点并入数据；触发时机：点击"展开 (N)"聚合，或展开 `hasChildren` 标记节点（本地已有下一级则不请求，直接本地切换） |

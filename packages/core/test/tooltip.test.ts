@@ -61,6 +61,12 @@ function tooltipEl(container: HTMLElement): HTMLDivElement {
   return el!
 }
 
+/** 与 core 的 TOOLTIP_HIDE_DELAY 对齐：等待防抖延迟到期 */
+const HIDE_DELAY = 150
+async function settleHide(): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, HIDE_DELAY + 30))
+}
+
 describe('悬浮框自定义内容（formatter 组件化）', () => {
   it('formatter 收到节点数据与上下文：depth/side/collapsed', () => {
     const formatter = vi.fn((_node: TreeNodeData, _ctx: TooltipContext) => 'x')
@@ -161,7 +167,7 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
     expect(tooltipEl(container).style.display).toBe('none')
   })
 
-  it('鼠标移出隐藏悬浮层', () => {
+  it('鼠标移出隐藏悬浮层（防抖延迟后）', async () => {
     const { container } = mount(fixture())
 
     const a = nodeById(container, 'a')
@@ -169,6 +175,7 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
     expect(tooltipEl(container).style.display).toBe('block')
 
     a.dispatchEvent(new MouseEvent('mouseleave'))
+    await settleHide()
     expect(tooltipEl(container).style.display).toBe('none')
   })
 
@@ -282,7 +289,7 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
   })
 
   describe('onTooltipHide 回调（封装层卸载时机的缝）', () => {
-    it('移出节点时触发', () => {
+    it('移出节点时触发（防抖延迟后）', async () => {
       const onTooltipHide = vi.fn()
       const { container } = mount(fixture(), { tooltip: { onTooltipHide } })
 
@@ -291,6 +298,7 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
       expect(onTooltipHide).not.toHaveBeenCalled()
 
       a.dispatchEvent(new MouseEvent('mouseleave'))
+      await settleHide()
       expect(onTooltipHide).toHaveBeenCalledTimes(1)
     })
 
@@ -315,6 +323,67 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
 
       tree.destroy()
       expect(onTooltipHide).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('防抖隐藏与弹窗可交互（移入弹窗内容区不消失）', () => {
+    it('悬浮层可交互：pointer-events 为 auto（不再挡不住鼠标）', () => {
+      const { container } = mount(fixture())
+      expect(tooltipEl(container).style.pointerEvents).toBe('auto')
+    })
+
+    it('移出节点后延迟期内仍显示，到期后才隐藏', async () => {
+      const { container } = mount(fixture())
+      const a = nodeById(container, 'a')
+
+      hover(a)
+      a.dispatchEvent(new MouseEvent('mouseleave'))
+      expect(tooltipEl(container).style.display).toBe('block') // 立即断言：防抖期内不消失
+
+      await settleHide()
+      expect(tooltipEl(container).style.display).toBe('none')
+    })
+
+    it('移出节点后移入弹窗：取消隐藏，弹窗保持显示', async () => {
+      const { container } = mount(fixture())
+      const a = nodeById(container, 'a')
+
+      hover(a)
+      a.dispatchEvent(new MouseEvent('mouseleave'))
+      const tip = tooltipEl(container)
+      tip.dispatchEvent(new MouseEvent('mouseenter'))
+
+      await settleHide()
+      expect(tip.style.display).toBe('block') // 已被弹窗 mouseenter 取消
+    })
+
+    it('弹窗内移出后延迟隐藏', async () => {
+      const { container } = mount(fixture())
+      const a = nodeById(container, 'a')
+
+      hover(a)
+      a.dispatchEvent(new MouseEvent('mouseleave'))
+      const tip = tooltipEl(container)
+      tip.dispatchEvent(new MouseEvent('mouseenter'))
+      tip.dispatchEvent(new MouseEvent('mouseleave'))
+
+      await settleHide()
+      expect(tip.style.display).toBe('none')
+    })
+
+    it('移出后快速悬停另一节点：取消待隐藏并直切新内容', async () => {
+      const { container } = mount(fixture(), { tooltip: { formatter: (n: TreeNodeData) => n.id } })
+      const a = nodeById(container, 'a')
+      const b = nodeById(container, 'b')
+
+      hover(a)
+      a.dispatchEvent(new MouseEvent('mouseleave'))
+      hover(b) // 延迟期内直切
+
+      await settleHide()
+      const tip = tooltipEl(container)
+      expect(tip.style.display).toBe('block')
+      expect(tip.textContent).toBe('b')
     })
   })
 })

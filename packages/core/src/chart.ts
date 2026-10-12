@@ -201,7 +201,8 @@ export function createBidirectionalTree(
     display: 'none',
     position: 'absolute',
     zIndex: '1000',
-    pointerEvents: 'none',
+    // 可交互：内容区可悬停、可点击（按钮/链接），配合防抖隐藏不挡操作
+    pointerEvents: 'auto',
     background: t.background,
     border: '1px solid ' + t.nodeStroke,
     borderRadius: '4px',
@@ -232,9 +233,29 @@ export function createBidirectionalTree(
   /** 当前锚定的节点（缩放/平移时跟随重算）；隐藏时为 null */
   let tooltipAnchor: LayoutNode | null = null
   let tooltipRafId = 0
+  /** 移出后的待隐藏计时器（防抖：给鼠标移入弹窗留出时间） */
+  let tooltipHideTimer: ReturnType<typeof setTimeout> | null = null
+  const TOOLTIP_HIDE_DELAY = 150
+
+  function cancelTooltipHide(): void {
+    if (tooltipHideTimer !== null) {
+      clearTimeout(tooltipHideTimer)
+      tooltipHideTimer = null
+    }
+  }
+
+  /** 移出节点/弹窗后延迟隐藏；期间再悬停节点或弹窗都会取消 */
+  function scheduleTooltipHide(): void {
+    cancelTooltipHide()
+    tooltipHideTimer = setTimeout(() => {
+      tooltipHideTimer = null
+      hideTooltip()
+    }, TOOLTIP_HIDE_DELAY)
+  }
 
   function showTooltip(d: LayoutNode): void {
     if (d.variant === 'aggregate') return
+    cancelTooltipHide()
     const ctx: TooltipContext = {
       depth: d.depth,
       side: d.side,
@@ -303,11 +324,16 @@ export function createBidirectionalTree(
 
   function hideTooltip(): void {
     if (tooltipEl.style.display === 'none') return // 已隐藏不重复回调
+    cancelTooltipHide()
     tooltipEl.style.display = 'none'
     tooltipAnchor = null
     cancelAnimationFrame(tooltipRafId)
     options.tooltip?.onTooltipHide?.()
   }
+
+  // 弹窗可交互：移入取消待隐藏，移出后同样防抖隐藏
+  tooltipEl.addEventListener('mouseenter', cancelTooltipHide)
+  tooltipEl.addEventListener('mouseleave', scheduleTooltipHide)
 
   // ---- 高亮/淡化样式注入 ----
   const styleEl = document.createElement('style')
@@ -866,7 +892,7 @@ export function createBidirectionalTree(
         }
       })
       .on('mouseenter', (_event, d) => showTooltip(d))
-      .on('mouseleave', hideTooltip)
+      .on('mouseleave', scheduleTooltipHide)
 
     if (customNodeRender) {
       nodeEnter.each(function (d) {
@@ -1108,6 +1134,7 @@ export function createBidirectionalTree(
       svg.remove()
       tooltipEl.remove()
       cancelAnimationFrame(tooltipRafId)
+      cancelTooltipHide()
       styleEl.remove()
     },
   }

@@ -79,7 +79,7 @@ describe('着色 + tooltip + 图例筛选（工单05）', () => {
     expect(groups[0]!.color).toMatch(/^#/)
   })
 
-  it('悬停显示 tooltip：默认渲染名称与 properties 键值并转义 HTML', () => {
+  it('悬停显示 tooltip：默认渲染名称与 properties 键值并转义 HTML', async () => {
     const { container } = mount(fixture())
     const tooltip = container.querySelector<HTMLDivElement>('div.d3t-tooltip')!
     expect(tooltip.style.display).toBe('none')
@@ -94,6 +94,8 @@ describe('着色 + tooltip + 图例筛选（工单05）', () => {
     expect(tooltip.querySelector('b')).toBeNull()
 
     hover(container.querySelector('g[data-id="a"]')!, 'mouseleave')
+    // 移出走防抖延迟（给移入弹窗留时间），到期后才隐藏
+    await new Promise(resolve => setTimeout(resolve, 180))
     expect(tooltip.style.display).toBe('none')
   })
 
