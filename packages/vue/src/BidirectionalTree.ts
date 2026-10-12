@@ -105,6 +105,10 @@ export const BidirectionalTree = defineComponent({
      * 组件状态不跨悬停留、onUnmounted 即时触发。
      */
     tooltipCache: { type: Boolean, default: true },
+    /** 移出节点/弹窗后的防抖隐藏延时（毫秒，默认 150）：期间移入弹窗取消隐藏；0 移出即藏 */
+    tooltipHideDelay: { type: Number, default: undefined },
+    /** 悬浮框显示/隐藏淡入淡出时长（毫秒，默认 150，0 关闭过渡）；"减少动态效果"偏好下默认关闭 */
+    tooltipFadeDuration: { type: Number, default: undefined },
     loadChildren: {
       type: Function as PropType<(parent: TreeNodeData) => Promise<TreeNodeData[]>>,
       default: undefined,
@@ -164,6 +168,11 @@ export const BidirectionalTree = defineComponent({
 
     function create(): void {
       if (!host.value) return
+      // 任一悬浮框定制项存在即组装配置对象（延时/时长不影响内容，也允许单独配置）
+      const hasTooltipConfig = !!(
+        slots.tooltip || props.tooltipFormatter || props.tooltipClassName
+        || props.tooltipHideDelay !== undefined || props.tooltipFadeDuration !== undefined
+      )
       currentOptions = {
         data: props.data,
         duration: props.duration,
@@ -181,11 +190,13 @@ export const BidirectionalTree = defineComponent({
         nodeRenderer: props.nodeRenderer ?? undefined,
         nodeTemplate: props.nodeTemplate ?? undefined,
         nodeColor: props.nodeColor ?? undefined,
-        tooltip: slots.tooltip || props.tooltipFormatter || props.tooltipClassName
+        tooltip: hasTooltipConfig
           ? {
               // 插槽优先于 tooltipFormatter（更富的表达）；两者都返回元素给 core 挂载
               formatter: slots.tooltip ? renderTooltipSlot : props.tooltipFormatter ?? undefined,
               className: props.tooltipClassName ?? undefined,
+              hideDelay: props.tooltipHideDelay ?? undefined,
+              fadeDuration: props.tooltipFadeDuration ?? undefined,
               // 关闭实例缓存：隐藏即卸载插槽内容（换节点直切由 formatter 内先卸载保证）
               onTooltipHide:
                 slots.tooltip && props.tooltipCache === false ? unmountTooltipSlot : undefined,
@@ -257,6 +268,8 @@ export const BidirectionalTree = defineComponent({
         props.tooltipFormatter,
         props.tooltipClassName,
         props.tooltipCache,
+        props.tooltipHideDelay,
+        props.tooltipFadeDuration,
         props.loadChildren,
         props.measureText,
         props.theme,

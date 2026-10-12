@@ -58,6 +58,10 @@ export interface BidirectionalTreeProps {
    * 组件状态不跨悬停留、effect cleanup 即时触发。
    */
   tooltipCache?: boolean
+  /** 移出节点/弹窗后的防抖隐藏延时（毫秒，默认 150）：期间移入弹窗取消隐藏；0 移出即藏 */
+  tooltipHideDelay?: number
+  /** 悬浮框显示/隐藏淡入淡出时长（毫秒，默认 150，0 关闭过渡）；"减少动态效果"偏好下默认关闭 */
+  tooltipFadeDuration?: number
   loadChildren?: (parent: TreeNodeData) => Promise<TreeNodeData[]>
   onLoadError?: (error: unknown, parent: TreeNodeData) => void
   /** 主题定制：浅合并到内置主题 */
@@ -136,6 +140,8 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       renderTooltip,
       tooltipClassName,
       tooltipCache,
+      tooltipHideDelay,
+      tooltipFadeDuration,
       loadChildren,
       toggleOnNodeClick,
       measureText,
@@ -144,6 +150,11 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
     } = props
     useEffect(() => {
       if (!hostRef.current) return
+      // 任一悬浮框定制项存在即组装配置对象（延时/时长不影响内容，也允许单独配置）
+      const hasTooltipConfig = !!(
+        renderTooltip || tooltipFormatter || tooltipClassName
+        || tooltipHideDelay !== undefined || tooltipFadeDuration !== undefined
+      )
       const options: TreeOptions = {
         data: propsRef.current.data,
         duration,
@@ -161,8 +172,7 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
         nodeRenderer,
         nodeTemplate,
         nodeColor,
-        tooltip:
-          renderTooltip || tooltipFormatter || tooltipClassName
+        tooltip: hasTooltipConfig
             ? {
                 // render-prop 优先于 tooltipFormatter（更富的表达）
                 formatter: renderTooltip
@@ -181,6 +191,8 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
                     }
                   : tooltipFormatter ?? undefined,
                 className: tooltipClassName ?? undefined,
+                hideDelay: tooltipHideDelay ?? undefined,
+                fadeDuration: tooltipFadeDuration ?? undefined,
                 // 关闭实例缓存：隐藏即卸载内容组件
                 onTooltipHide:
                   renderTooltip && tooltipCache === false ? unmountTooltipLayer : undefined,
@@ -230,6 +242,8 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       renderTooltip,
       tooltipClassName,
       tooltipCache,
+      tooltipHideDelay,
+      tooltipFadeDuration,
       loadChildren,
       toggleOnNodeClick,
       measureText,

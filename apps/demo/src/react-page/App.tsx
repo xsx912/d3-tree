@@ -60,6 +60,8 @@ export default function App() {
 
   // ---- 悬浮框实例缓存验证（renderTooltip + tooltipCache 开关） ----
   const [tooltipCache, setTooltipCache] = useState(true)
+  const [tipHideDelay, setTipHideDelay] = useState(150)
+  const [tipFadeDuration, setTipFadeDuration] = useState(150)
   const [tipMounts, setTipMounts] = useState(0)
   const [tipUnmounts, setTipUnmounts] = useState(0)
   const [tipLogs, setTipLogs] = useState<string[]>([])
@@ -256,6 +258,30 @@ export default function App() {
             <button className={tooltipCache ? undefined : 'primary'} onClick={toggleTipCache}>
               实例缓存：{tooltipCache ? '开' : '关'}
             </button>
+            <label className="tb-check">
+              延时
+              <input
+                type="number"
+                min={0}
+                step={50}
+                style={{ width: 56 }}
+                value={tipHideDelay}
+                aria-label="隐藏防抖延时（毫秒）"
+                onChange={e => setTipHideDelay(Math.max(0, Number(e.target.value) || 0))}
+              />
+            </label>
+            <label className="tb-check">
+              时长
+              <input
+                type="number"
+                min={0}
+                step={50}
+                style={{ width: 56 }}
+                value={tipFadeDuration}
+                aria-label="淡入淡出时长（毫秒）"
+                onChange={e => setTipFadeDuration(Math.max(0, Number(e.target.value) || 0))}
+              />
+            </label>
             <span className="tb-stat">
               挂载 {tipMounts} · 卸载 {tipUnmounts}
             </span>
@@ -284,6 +310,8 @@ export default function App() {
           colorByGroup
           renderTooltip={renderTooltip}
           tooltipCache={tooltipCache}
+          tooltipHideDelay={tipHideDelay}
+          tooltipFadeDuration={tipFadeDuration}
           onNodeSelect={onNodeSelect}
           onGroupsChange={onGroupsChange}
         />

@@ -61,10 +61,12 @@ function tooltipEl(container: HTMLElement): HTMLDivElement {
   return el!
 }
 
-/** 与 core 的 TOOLTIP_HIDE_DELAY 对齐：等待防抖延迟到期 */
+/** 与 core 默认值对齐：防抖延时 + 淡出时长后彻底隐藏 */
 const HIDE_DELAY = 150
+const FADE_DURATION = 150
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
 async function settleHide(): Promise<void> {
-  await new Promise(resolve => setTimeout(resolve, HIDE_DELAY + 30))
+  await sleep(HIDE_DELAY + FADE_DURATION + 60)
 }
 
 describe('悬浮框自定义内容（formatter 组件化）', () => {
@@ -384,6 +386,104 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
       const tip = tooltipEl(container)
       expect(tip.style.display).toBe('block')
       expect(tip.textContent).toBe('b')
+    })
+  })
+
+  describe('淡入淡出与延时可配（fadeDuration / hideDelay）', () => {
+    it('显示即时且目标不透明（淡入由 CSS 过渡渲染，jsdom 断言目标值）', () => {
+      const { container } = mount(fixture())
+
+      hover(nodeById(container, 'a'))
+      const tip = tooltipEl(container)
+      expect(tip.style.display).toBe('block') // 无显示延时
+      expect(tip.style.opacity).toBe('1')
+    })
+
+    it('节点间直切不重新入场：保持可见不重置透明度', () => {
+      const { container } = mount(fixture())
+
+      hover(nodeById(container, 'a'))
+      hover(nodeById(container, 'b'))
+      const tip = tooltipEl(container)
+      expect(tip.style.display).toBe('block')
+      expect(tip.style.opacity).toBe('1')
+    })
+
+    it('hideDelay 可配：延长防抖窗口', async () => {
+      const { container } = mount(fixture(), { tooltip: { hideDelay: 300, fadeDuration: 0 } })
+
+      const a = nodeById(container, 'a')
+      hover(a)
+      a.dispatchEvent(new MouseEvent('mouseleave'))
+      await sleep(200)
+      expect(tooltipEl(container).style.display).toBe('block') // 仍在加长后的防抖窗口内
+      await sleep(250)
+      expect(tooltipEl(container).style.display).toBe('none')
+    })
+
+    it('fadeDuration 0：防抖到期立即隐藏（无淡出等待）', async () => {
+      const { container } = mount(fixture(), { tooltip: { hideDelay: 0, fadeDuration: 0 } })
+
+      const a = nodeById(container, 'a')
+      hover(a)
+      a.dispatchEvent(new MouseEvent('mouseleave'))
+      await sleep(30)
+      expect(tooltipEl(container).style.display).toBe('none')
+    })
+
+    it('默认淡出：防抖到期后淡出中仍显示，淡出完成才隐藏并触发 onTooltipHide', async () => {
+      const onTooltipHide = vi.fn()
+      const { container } = mount(fixture(), { tooltip: { onTooltipHide } })
+
+      const a = nodeById(container, 'a')
+      hover(a)
+      a.dispatchEvent(new MouseEvent('mouseleave'))
+      await sleep(HIDE_DELAY + 80) // 防抖已过、淡出进行中
+      const tip = tooltipEl(container)
+      expect(tip.style.display).toBe('block')
+      expect(tip.style.opacity).toBe('0')
+      expect(onTooltipHide).not.toHaveBeenCalled()
+      await sleep(FADE_DURATION + 80) // 淡出完成
+      expect(tip.style.display).toBe('none')
+      expect(onTooltipHide).toHaveBeenCalledTimes(1)
+    })
+
+    it('淡出中移回弹窗：取消隐藏并恢复不透明', async () => {
+      const onTooltipHide = vi.fn()
+      const { container } = mount(fixture(), {
+        tooltip: { hideDelay: 0, fadeDuration: 300, onTooltipHide },
+      })
+
+      const a = nodeById(container, 'a')
+      hover(a)
+      a.dispatchEvent(new MouseEvent('mouseleave'))
+      await sleep(80) // 淡出进行中
+      const tip = tooltipEl(container)
+      expect(tip.style.opacity).toBe('0')
+
+      tip.dispatchEvent(new MouseEvent('mouseenter'))
+      expect(tip.style.opacity).toBe('1') // 立即淡回
+      await sleep(400)
+      expect(tip.style.display).toBe('block')
+      expect(onTooltipHide).not.toHaveBeenCalled()
+    })
+
+    it('系统减少动态效果偏好下，未显式配置 fadeDuration 时跳过淡入淡出', async () => {
+      vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }))
+      try {
+        const { container } = mount(fixture())
+        const a = nodeById(container, 'a')
+
+        hover(a)
+        const tip = tooltipEl(container)
+        expect(tip.style.opacity).toBe('1') // 无淡入起点，直接不透明
+
+        a.dispatchEvent(new MouseEvent('mouseleave'))
+        await sleep(HIDE_DELAY + 80) // 防抖到期即隐藏，无淡出等待
+        expect(tip.style.display).toBe('none')
+      } finally {
+        vi.unstubAllGlobals()
+      }
     })
   })
 })

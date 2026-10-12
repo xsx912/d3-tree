@@ -195,10 +195,17 @@ export function createBidirectionalTree(
   if (getComputedStyle(container).position === 'static') {
     container.style.position = 'relative'
   }
+  /** 悬浮框显隐节奏：移出防抖延时与淡入淡出时长（"减少动态效果"偏好下未显式配置时无过渡） */
+  const tooltipHideDelay = Math.max(0, options.tooltip?.hideDelay ?? 150)
+  const tooltipFadeDuration = Math.max(
+    0,
+    options.tooltip?.fadeDuration ?? (prefersReducedMotion ? 0 : 150),
+  )
   const tooltipEl = document.createElement('div')
   tooltipEl.className = `d3t-tooltip${options.tooltip?.className ? ` ${options.tooltip.className}` : ''}`
   Object.assign(tooltipEl.style, {
     display: 'none',
+    opacity: '0',
     position: 'absolute',
     zIndex: '1000',
     // 可交互：内容区可悬停、可点击（按钮/链接），配合防抖隐藏不挡操作
@@ -214,6 +221,7 @@ export function createBidirectionalTree(
     lineHeight: '1.7',
     maxWidth: '280px',
   } satisfies Partial<CSSStyleDeclaration>)
+  if (tooltipFadeDuration > 0) tooltipEl.style.transition = `opacity ${tooltipFadeDuration}ms ease`
   container.appendChild(tooltipEl)
 
   function escapeHtml(text: string): string {
@@ -235,26 +243,54 @@ export function createBidirectionalTree(
   let tooltipRafId = 0
   /** 移出后的待隐藏计时器（防抖：给鼠标移入弹窗留出时间） */
   let tooltipHideTimer: ReturnType<typeof setTimeout> | null = null
-  const TOOLTIP_HIDE_DELAY = 150
+  /** 淡出进行中的计时器（到期才真正隐藏并回调） */
+  let tooltipFadeTimer: ReturnType<typeof setTimeout> | null = null
 
   function cancelTooltipHide(): void {
     if (tooltipHideTimer !== null) {
       clearTimeout(tooltipHideTimer)
       tooltipHideTimer = null
     }
+    if (tooltipFadeTimer !== null) {
+      clearTimeout(tooltipFadeTimer)
+      tooltipFadeTimer = null
+    }
+    // 淡出中途取消（移回节点/弹窗）：恢复不透明
+    if (tooltipEl.style.display !== 'none' && tooltipEl.style.opacity === '0') {
+      tooltipEl.style.opacity = '1'
+    }
   }
 
-  /** 移出节点/弹窗后延迟隐藏；期间再悬停节点或弹窗都会取消 */
+  /** 真正隐藏（防抖与淡出完成后）：幂等，触发 onTooltipHide */
+  function finalizeTooltipHide(): void {
+    if (tooltipEl.style.display === 'none') return // 已隐藏不重复回调
+    tooltipEl.style.display = 'none'
+    tooltipAnchor = null
+    cancelAnimationFrame(tooltipRafId)
+    options.tooltip?.onTooltipHide?.()
+  }
+
+  /** 移出节点/弹窗后：防抖延时，再淡出隐藏；期间再悬停节点或弹窗都会取消 */
   function scheduleTooltipHide(): void {
     cancelTooltipHide()
     tooltipHideTimer = setTimeout(() => {
       tooltipHideTimer = null
-      hideTooltip()
-    }, TOOLTIP_HIDE_DELAY)
+      if (tooltipFadeDuration > 0) {
+        tooltipEl.style.opacity = '0' // 淡出启动，过渡完成时才真正隐藏
+        tooltipFadeTimer = setTimeout(() => {
+          tooltipFadeTimer = null
+          finalizeTooltipHide()
+        }, tooltipFadeDuration)
+      } else {
+        finalizeTooltipHide()
+      }
+    }, tooltipHideDelay)
   }
 
   function showTooltip(d: LayoutNode): void {
     if (d.variant === 'aggregate') return
+    // 从隐藏翻开才需要淡入启动；节点间直切保持可见不重入场（淡出中断由 cancel 恢复）
+    const wasHidden = tooltipEl.style.display === 'none'
     cancelTooltipHide()
     const ctx: TooltipContext = {
       depth: d.depth,
@@ -268,6 +304,14 @@ export function createBidirectionalTree(
     else tooltipEl.replaceChildren(content)
     tooltipAnchor = d
     tooltipEl.style.display = 'block'
+    if (wasHidden) {
+      if (tooltipFadeDuration > 0) {
+        tooltipEl.style.opacity = '0'
+        void tooltipEl.offsetWidth // 先落定透明起点，再设目标值才能触发过渡
+      }
+      tooltipEl.style.opacity = '1' // 时长 0 也要兜底初始/残留的透明值
+    }
+    // 淡出中断：cancelTooltipHide 已把 opacity 平滑恢复；节点间直切：保持可见不重入场
     positionTooltip()
     // 内容尺寸在替换后一帧才稳定（字体/React 并发提交），两帧后补一次翻转修正
     if (typeof requestAnimationFrame === 'function') {
@@ -322,13 +366,10 @@ export function createBidirectionalTree(
     tooltipEl.style.top = `${y}px`
   }
 
+  /** 立即隐藏（重渲染锚点失效防御）：清待隐藏计时器，不走淡出 */
   function hideTooltip(): void {
-    if (tooltipEl.style.display === 'none') return // 已隐藏不重复回调
     cancelTooltipHide()
-    tooltipEl.style.display = 'none'
-    tooltipAnchor = null
-    cancelAnimationFrame(tooltipRafId)
-    options.tooltip?.onTooltipHide?.()
+    finalizeTooltipHide()
   }
 
   // 弹窗可交互：移入取消待隐藏，移出后同样防抖隐藏

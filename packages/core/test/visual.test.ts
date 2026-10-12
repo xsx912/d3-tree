@@ -94,8 +94,8 @@ describe('着色 + tooltip + 图例筛选（工单05）', () => {
     expect(tooltip.querySelector('b')).toBeNull()
 
     hover(container.querySelector('g[data-id="a"]')!, 'mouseleave')
-    // 移出走防抖延迟（给移入弹窗留时间），到期后才隐藏
-    await new Promise(resolve => setTimeout(resolve, 180))
+    // 移出走防抖延迟 + 淡出（给移入弹窗留时间），两者完成后才隐藏
+    await new Promise(resolve => setTimeout(resolve, 360))
     expect(tooltip.style.display).toBe('none')
   })
 
