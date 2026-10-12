@@ -32,6 +32,12 @@ importers:
       '@d3-tree/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@d3-tree/react':
+        specifier: workspace:*
+        version: link:../../packages/react
+      '@d3-tree/vue':
+        specifier: workspace:*
+        version: link:../../packages/vue
       react:
         specifier: ^19.3.0
         version: 19.3.0

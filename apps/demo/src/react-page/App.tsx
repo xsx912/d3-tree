@@ -1,12 +1,50 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { BidirectionalTree } from '@d3-tree/react'
-import type { BidirectionalTreeHandle, TreeNodeData } from '@d3-tree/react'
+import type {
+  BidirectionalTreeHandle,
+  TooltipContext,
+  TreeNodeData,
+} from '@d3-tree/react'
 import { industryData } from '../data'
 
 type PickMode = 'none' | 'add' | 'remove'
 
 const DEFAULT_HINT = '点击节点可折叠/展开；滚轮缩放、拖拽平移'
+
+const SIDE_NAMES: Record<string, string> = { left: '左侧', right: '右侧', center: '中枢' }
+
+/** 悬浮卡内容组件：内部计数器用于验证缓存模式下组件状态是否跨悬停留 */
+function TooltipCard({ node, ctx, onMount, onUnmount }: {
+  node: TreeNodeData
+  ctx: TooltipContext
+  onMount: (name: string) => void
+  onUnmount: (name: string) => void
+}) {
+  const [count, setCount] = useState(0)
+  const nameRef = useRef(node.name)
+  nameRef.current = node.name
+  useEffect(() => {
+    onMount(node.name)
+    return () => onUnmount(nameRef.current)
+    // 挂载/卸载严格对应 createRoot 新实例/unmount，不随节点切换重跑
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return (
+    <div style={{ minWidth: 220 }}>
+      <div style={{ fontWeight: 600, marginBottom: 4 }}>{node.name}</div>
+      <div style={{ color: '#409EFF', fontSize: 12, marginBottom: 8 }}>
+        L{ctx.depth} · {SIDE_NAMES[ctx.side] ?? ctx.side} · {ctx.collapsed ? '已收起' : '展开中'}
+      </div>
+      <button
+        style={{ fontSize: 12, padding: '2px 10px', cursor: 'pointer' }}
+        onClick={() => setCount(c => c + 1)}
+      >
+        内部状态：{count}（点我 +1）
+      </button>
+    </div>
+  )
+}
 
 export default function App() {
   const tree = useRef<BidirectionalTreeHandle | null>(null)
@@ -19,6 +57,40 @@ export default function App() {
   const [searchKw, setSearchKw] = useState('')
   const [groups, setGroups] = useState<Array<{ name: string; color: string }>>([])
   const [activeGroups, setActiveGroups] = useState<Set<string>>(new Set())
+
+  // ---- 悬浮框实例缓存验证（renderTooltip + tooltipCache 开关） ----
+  const [tooltipCache, setTooltipCache] = useState(true)
+  const [tipMounts, setTipMounts] = useState(0)
+  const [tipUnmounts, setTipUnmounts] = useState(0)
+  const [tipLogs, setTipLogs] = useState<string[]>([])
+
+  const pushTipLog = useCallback((msg: string) => {
+    const t = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+    setTipLogs(l => [...l, `${t} ${msg}`].slice(-6))
+  }, [])
+
+  const onTipMount = useCallback((name: string) => {
+    setTipMounts(m => m + 1)
+    pushTipLog(`挂载「${name}」`)
+  }, [pushTipLog])
+
+  const onTipUnmount = useCallback((name: string) => {
+    setTipUnmounts(m => m + 1)
+    pushTipLog(`卸载「${name}」`)
+  }, [pushTipLog])
+
+  const renderTooltip = useCallback(
+    (node: TreeNodeData, ctx: TooltipContext) => (
+      <TooltipCard node={node} ctx={ctx} onMount={onTipMount} onUnmount={onTipUnmount} />
+    ),
+    [onTipMount, onTipUnmount],
+  )
+
+  const toggleTipCache = useCallback(() => {
+    const next = !tooltipCache
+    setTooltipCache(next)
+    pushTipLog(`实例缓存切换为「${next ? '开' : '关'}」，整树按配置重建`)
+  }, [tooltipCache, pushTipLog])
 
   const enterMode = useCallback((next: PickMode) => {
     setMode(next)
@@ -177,6 +249,18 @@ export default function App() {
             <button onClick={() => tree.current?.zoomToFit()}>适配视窗</button>
           </div>
         </div>
+        <span className="divider" />
+        <div className="tb-group" role="group" aria-label="悬浮框">
+          <span className="tb-label">悬浮框</span>
+          <div className="tb-controls">
+            <button className={tooltipCache ? undefined : 'primary'} onClick={toggleTipCache}>
+              实例缓存：{tooltipCache ? '开' : '关'}
+            </button>
+            <span className="tb-stat">
+              挂载 {tipMounts} · 卸载 {tipUnmounts}
+            </span>
+          </div>
+        </div>
         <span id="hint" className={mode !== 'none' ? 'active' : undefined}>
           {hint}
         </span>
@@ -198,9 +282,34 @@ export default function App() {
           ref={tree}
           data={industryData}
           colorByGroup
+          renderTooltip={renderTooltip}
+          tooltipCache={tooltipCache}
           onNodeSelect={onNodeSelect}
           onGroupsChange={onGroupsChange}
         />
+      </div>
+      <div
+        aria-live="polite"
+        style={{
+          position: 'fixed',
+          right: 12,
+          bottom: 12,
+          zIndex: 30,
+          maxWidth: 280,
+          padding: '8px 12px',
+          background: 'rgba(255, 255, 255, 0.92)',
+          border: '1px solid #EBEEF5',
+          borderRadius: 6,
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+          fontSize: 12,
+          lineHeight: 1.8,
+          color: '#606266',
+          pointerEvents: 'none',
+        }}
+      >
+        {tipLogs.map((l, i) => (
+          <div key={i}>{l}</div>
+        ))}
       </div>
     </>
   )

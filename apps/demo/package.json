@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "@d3-tree/core": "workspace:*",
+    "@d3-tree/react": "workspace:*",
+    "@d3-tree/vue": "workspace:*",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "vue": "^3.5.43"
