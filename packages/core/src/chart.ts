@@ -195,7 +195,8 @@ export function createBidirectionalTree(
   if (getComputedStyle(container).position === 'static') {
     container.style.position = 'relative'
   }
-  /** 悬浮框显隐节奏：移出防抖延时与淡入淡出时长（"减少动态效果"偏好下未显式配置时无过渡） */
+  /** 悬浮框显隐节奏：移入显示延时/移出防抖延时与淡入淡出时长（"减少动态效果"偏好下未显式配置时无过渡） */
+  const tooltipShowDelay = Math.max(0, options.tooltip?.showDelay ?? 0)
   const tooltipHideDelay = Math.max(0, options.tooltip?.hideDelay ?? 150)
   const tooltipFadeDuration = Math.max(
     0,
@@ -243,6 +244,15 @@ export function createBidirectionalTree(
   let tooltipRafId = 0
   /** 移出后的待隐藏计时器（防抖：给鼠标移入弹窗留出时间） */
   let tooltipHideTimer: ReturnType<typeof setTimeout> | null = null
+  /** 移入后的待显示计时器（showDelay>0 时：悬停停留才出现，期间移出/换节点取消重启） */
+  let tooltipShowTimer: ReturnType<typeof setTimeout> | null = null
+
+  function cancelTooltipShow(): void {
+    if (tooltipShowTimer !== null) {
+      clearTimeout(tooltipShowTimer)
+      tooltipShowTimer = null
+    }
+  }
   /** 淡出进行中的计时器（到期才真正隐藏并回调） */
   let tooltipFadeTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -376,8 +386,9 @@ export function createBidirectionalTree(
     tooltipEl.style.top = `${y}px`
   }
 
-  /** 立即隐藏（重渲染锚点失效防御）：清待隐藏计时器，不走淡出 */
+  /** 立即隐藏（重渲染锚点失效防御）：清待显示/待隐藏计时器，不走淡出 */
   function hideTooltip(): void {
+    cancelTooltipShow()
     cancelTooltipHide()
     finalizeTooltipHide()
   }
@@ -958,6 +969,14 @@ export function createBidirectionalTree(
           // 自接管模式：只发事件，内置悬浮框停用
           hoverLastNode = d
           options.onNodeHover(d.data, buildHoverCtx(d, this))
+        } else if (tooltipShowDelay > 0) {
+          // 显示延时：悬停停留才出现（扫过节点不弹窗），换节点重启计时
+          cancelTooltipShow()
+          const el = this
+          tooltipShowTimer = setTimeout(() => {
+            tooltipShowTimer = null
+            showTooltip(d, el)
+          }, tooltipShowDelay)
         } else {
           showTooltip(d, this)
         }
@@ -968,6 +987,7 @@ export function createBidirectionalTree(
           if (hoverLastNode) options.onNodeHoverEnd?.(hoverLastNode.data)
           hoverLastNode = null
         } else {
+          cancelTooltipShow() // 延时未到的显示取消（从未显示则防抖隐藏无事可做）
           scheduleTooltipHide()
         }
       })
@@ -1219,6 +1239,7 @@ export function createBidirectionalTree(
       svg.remove()
       tooltipEl.remove()
       cancelAnimationFrame(tooltipRafId)
+      cancelTooltipShow()
       cancelTooltipHide()
       hoverLastNode = null // destroy 不发 end（对齐 onTooltipHide 先例，组件卸载自管清理）
       styleEl.remove()

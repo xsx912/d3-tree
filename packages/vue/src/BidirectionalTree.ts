@@ -105,6 +105,8 @@ export const BidirectionalTree = defineComponent({
      * 组件状态不跨悬停留、onUnmounted 即时触发。
      */
     tooltipCache: { type: Boolean, default: true },
+    /** 移入节点后的显示延时（毫秒，默认 0 即刻显示）：悬停停留才出现，扫过节点不弹窗 */
+    tooltipShowDelay: { type: Number, default: undefined },
     /** 移出节点/弹窗后的防抖隐藏延时（毫秒，默认 150）：期间移入弹窗取消隐藏；0 移出即藏 */
     tooltipHideDelay: { type: Number, default: undefined },
     /** 悬浮框显示/隐藏淡入淡出时长（毫秒，默认 150，0 关闭过渡）；"减少动态效果"偏好下默认关闭 */
@@ -186,6 +188,7 @@ export const BidirectionalTree = defineComponent({
       // 任一悬浮框定制项存在即组装配置对象（延时/时长不影响内容，也允许单独配置）
       const hasTooltipConfig = !!(
         slots.tooltip || props.tooltipFormatter || props.tooltipClassName
+        || props.tooltipShowDelay !== undefined
         || props.tooltipHideDelay !== undefined || props.tooltipFadeDuration !== undefined
       )
       currentOptions = {
@@ -210,8 +213,9 @@ export const BidirectionalTree = defineComponent({
           ? {
               // 插槽优先于 tooltipFormatter（更富的表达）；两者都返回元素给 core 挂载
               formatter: slots.tooltip ? renderTooltipSlot : props.tooltipFormatter ?? undefined,
-              className: props.tooltipClassName ?? undefined,
-              hideDelay: props.tooltipHideDelay ?? undefined,
+                className: props.tooltipClassName ?? undefined,
+                showDelay: props.tooltipShowDelay ?? undefined,
+                hideDelay: props.tooltipHideDelay ?? undefined,
               fadeDuration: props.tooltipFadeDuration ?? undefined,
               // 关闭实例缓存：隐藏即卸载插槽内容（换节点直切由 formatter 内先卸载保证）
               onTooltipHide:
@@ -287,6 +291,7 @@ export const BidirectionalTree = defineComponent({
         props.tooltipFormatter,
         props.tooltipClassName,
         props.tooltipCache,
+        props.tooltipShowDelay,
         props.tooltipHideDelay,
         props.tooltipFadeDuration,
         props.onNodeHover,

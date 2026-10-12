@@ -60,6 +60,7 @@ export default function App() {
 
   // ---- 悬浮框实例缓存验证（renderTooltip + tooltipCache 开关） ----
   const [tooltipCache, setTooltipCache] = useState(true)
+  const [tipShowDelay, setTipShowDelay] = useState(0)
   const [tipHideDelay, setTipHideDelay] = useState(150)
   const [tipFadeDuration, setTipFadeDuration] = useState(150)
   const [tipMounts, setTipMounts] = useState(0)
@@ -259,6 +260,18 @@ export default function App() {
               实例缓存：{tooltipCache ? '开' : '关'}
             </button>
             <label className="tb-check">
+              显示
+              <input
+                type="number"
+                min={0}
+                step={50}
+                style={{ width: 56 }}
+                value={tipShowDelay}
+                aria-label="移入显示延时（毫秒）"
+                onChange={e => setTipShowDelay(Math.max(0, Number(e.target.value) || 0))}
+              />
+            </label>
+            <label className="tb-check">
               延时
               <input
                 type="number"
@@ -310,6 +323,7 @@ export default function App() {
           colorByGroup
           renderTooltip={renderTooltip}
           tooltipCache={tooltipCache}
+          tooltipShowDelay={tipShowDelay}
           tooltipHideDelay={tipHideDelay}
           tooltipFadeDuration={tipFadeDuration}
           onNodeSelect={onNodeSelect}

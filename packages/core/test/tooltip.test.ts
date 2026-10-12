@@ -511,6 +511,53 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
     })
   })
 
+  describe('移入显示延时（tooltip.showDelay，默认 0 即刻显示）', () => {
+    it('showDelay 200：悬停后延时到才显示', async () => {
+      const { container } = mount(fixture(), { tooltip: { showDelay: 200, fadeDuration: 0 } })
+      const a = nodeById(container, 'a')
+
+      hover(a)
+      expect(tooltipEl(container).style.display).toBe('none') // 延时窗口内不显示
+
+      await sleep(260)
+      expect(tooltipEl(container).style.display).toBe('block')
+    })
+
+    it('默认 0：即刻显示（现状不变）', () => {
+      const { container } = mount(fixture())
+      hover(nodeById(container, 'a'))
+      expect(tooltipEl(container).style.display).toBe('block')
+    })
+
+    it('计时期间移出：取消显示，不再出现', async () => {
+      const onTooltipHide = vi.fn()
+      const { container } = mount(fixture(), {
+        tooltip: { showDelay: 200, fadeDuration: 0, onTooltipHide },
+      })
+      const a = nodeById(container, 'a')
+
+      hover(a)
+      a.dispatchEvent(new MouseEvent('mouseleave'))
+      await sleep(300)
+      expect(tooltipEl(container).style.display).toBe('none') // 计时被取消
+      expect(onTooltipHide).not.toHaveBeenCalled() // 从未显示过，不触发隐藏回调
+    })
+
+    it('计时期间换节点：只显示后一个节点', async () => {
+      const { container } = mount(fixture(), {
+        tooltip: { showDelay: 200, fadeDuration: 0, formatter: (n: TreeNodeData) => n.id },
+      })
+
+      hover(nodeById(container, 'a'))
+      hover(nodeById(container, 'b')) // 计时中直切：前计时取消、按后节点重启
+
+      await sleep(300)
+      const tip = tooltipEl(container)
+      expect(tip.style.display).toBe('block')
+      expect(tip.textContent).toBe('b')
+    })
+  })
+
   describe('内容尺寸变化后重定位（异步详情撑高悬浮层）', () => {
     it('异步内容撑高后按新尺寸重算锚定位置（不再压到节点）', () => {
       FakeResizeObserver.instances = []

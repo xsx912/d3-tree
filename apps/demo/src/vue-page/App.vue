@@ -83,6 +83,7 @@ function onGroupsChange(gs: Array<{ name: string; color: string }>): void {
 
 // ---- 悬浮框实例缓存验证（#tooltip 插槽 + tooltipCache 开关） ----
 const tooltipCache = ref(true)
+const tipShowDelay = ref(0)
 const tipHideDelay = ref(150)
 const tipFadeDuration = ref(150)
 const tipMounts = ref(0)
@@ -191,6 +192,10 @@ const TooltipCard = defineComponent({
         <button :class="{ primary: !tooltipCache }" @click="toggleTipCache">
           实例缓存：{{ tooltipCache ? '开' : '关' }}
         </button>
+        <label class="tb-check">显示
+          <input type="number" min="0" step="50" style="width: 56px" v-model.number="tipShowDelay"
+            aria-label="移入显示延时（毫秒）" @change="tipShowDelay = Math.max(0, tipShowDelay || 0)">
+        </label>
         <label class="tb-check">延时
           <input type="number" min="0" step="50" style="width: 56px" v-model.number="tipHideDelay"
             aria-label="隐藏防抖延时（毫秒）" @change="tipHideDelay = Math.max(0, tipHideDelay || 0)">
@@ -212,7 +217,8 @@ const TooltipCard = defineComponent({
   </div>
   <div id="chart">
     <BidirectionalTree ref="tree" :data="industryData" color-by-group :tooltip-cache="tooltipCache"
-      :tooltip-hide-delay="tipHideDelay" :tooltip-fade-duration="tipFadeDuration"
+      :tooltip-show-delay="tipShowDelay" :tooltip-hide-delay="tipHideDelay"
+      :tooltip-fade-duration="tipFadeDuration"
       @node-select="onNodeSelect" @groups-change="onGroupsChange">
       <template #tooltip="{ node, ctx }">
         <TooltipCard :node="node" :ctx="ctx" />
