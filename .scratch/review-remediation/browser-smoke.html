@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="UTF-8"><title>修复回归验证</title>
+<style>body{font:16px system-ui;margin:20px}#tree{width:900px;height:450px}button{padding:10px;margin:4px}pre{white-space:pre-wrap}</style>
+<h1>修复回归验证</h1><button id="full">加载完整示例</button><button id="svg">导出 SVG</button><button id="png">导出 PNG</button><button id="perf">测量宽树与均衡树</button><pre id="status">ready</pre><div id="tree"></div>
+<script type="module">
+import { createBidirectionalTree } from '/@fs/D:/open-ode/d3-tree/packages/core/src/index.ts'
+import { industryData } from '/@fs/D:/open-ode/d3-tree/apps/demo/src/data.ts'
+const status = document.querySelector('#status')
+let chart = createBidirectionalTree(document.querySelector('#tree'), { data: {id:'root',name:'root',children:[{id:'a',name:'child'}]}, duration:0 })
+document.querySelector('#full').onclick=()=>{ chart.setData(structuredClone(industryData)); status.textContent='full sample loaded' }
+for (const format of ['svg','png']) document.querySelector('#'+format).onclick = async () => {
+  status.textContent = 'export '+format+' started'
+  try { await chart.exportImage({format,filename:'review-smoke'}); status.textContent='export '+format+' resolved' }
+  catch(error) { status.textContent='export '+format+' rejected: '+error.message }
+}
+document.querySelector('#perf').onclick = () => {
+  const results=[]
+  for(const shape of ['wide','balanced']) for(const count of [100,1000,5000]) {
+    const data={id:'root',name:'root',children:[]}; const nodes=[data]
+    for(let index=1;index<count;index++) {
+      const node={id:'n'+index,name:'node '+index,children:[]}
+      const parent=shape==='wide'?data:nodes[Math.floor((index-1)/4)]
+      parent.children.push(node);nodes.push(node)
+    }
+    for(const limit of [5,0]) {
+      chart.destroy()
+      const start=performance.now()
+      chart=createBidirectionalTree(document.querySelector('#tree'),{data,duration:0,visibleChildrenLimit:limit})
+      const visible=document.querySelectorAll('g.d3t-node').length
+      const created=performance.now(); chart.search('node 9'); const searched=performance.now()
+      results.push({shape,count,limit,visible,createMs:+(created-start).toFixed(1),searchMs:+(searched-created).toFixed(1)})
+    }
+  }
+  status.textContent=JSON.stringify({userAgent:navigator.userAgent,results},null,2)
+}
+</script></html>

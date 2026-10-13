@@ -1,5 +1,5 @@
 ---
-'@d3-tree/core': patch
+'@d3-tree/core': minor
 '@d3-tree/vue': minor
 '@d3-tree/react': minor
 ---

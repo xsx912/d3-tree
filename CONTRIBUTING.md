@@ -5,16 +5,18 @@
 ## 开发环境
 
 ```bash
-pnpm install        # 安装依赖（需要 Node >= 18 与 pnpm >= 10）
+pnpm install        # Node 22.20+（22.x）或 >=24.12；pnpm 10.15.0
 pnpm dev            # demo 三页（Vite，默认 5183 端口）
 pnpm docs:dev       # 文档站（VitePress）
-pnpm test           # Vitest（packages/core）
+pnpm test           # Vitest（core 公共 API 与 Vue/React 生命周期）
 pnpm typecheck      # tsc --noEmit（三包）
 pnpm lint           # ESLint
-pnpm build          # tsup 构建三包
+pnpm build          # 三库 + demo + docs
 ```
 
 仓库为 pnpm monorepo：`packages/core`（框架无关核心）、`packages/vue`、`packages/react` 为发布包，`apps/demo`、`apps/docs` 为演示与文档站（不发布）。
+
+开发环境最低版本取自锁文件：Vite 7 要求 Node 20.19+/22.12+，Linux 构建链中的 `@napi-rs/lzma-linux-x64-gnu` 要求 22.20+/24.12+。这描述仓库开发工具，不等于发布库的消费环境要求。CI 同时验证 22.20.0 和 24.12.0。
 
 ## 提交规范
 

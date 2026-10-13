@@ -1,0 +1,168 @@
+最低版本验证：v22.20.0
+Scope: all 6 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+
+Done in 631ms using pnpm v10.15.0
+
+> d3-tree@0.1.0 lint D:\open-ode\d3-tree
+> eslint .
+
+
+> d3-tree@0.1.0 typecheck D:\open-ode\d3-tree
+> pnpm -r run typecheck
+
+Scope: 5 of 6 workspace projects
+packages/core typecheck$ tsc --noEmit
+packages/core typecheck: Done
+packages/react typecheck$ tsc --noEmit
+packages/vue typecheck$ tsc --noEmit
+packages/react typecheck: Done
+packages/vue typecheck: Done
+
+> d3-tree@0.1.0 test D:\open-ode\d3-tree
+> pnpm -r run test
+
+Scope: 5 of 6 workspace projects
+packages/core test$ vitest run
+packages/core test:  RUN  v3.2.7 D:/open-ode/d3-tree/packages/core
+packages/core test:  ✓ test/a11y.test.ts (6 tests) 448ms
+packages/core test:  ✓ test/fade-transition.test.ts (5 tests) 1164ms
+packages/core test:    ✓ fadeOpacity 展开淡入/收起淡出（过渡过程） > 收起时子节点随回拢位移同步淡出，过渡结束后移除  339ms
+packages/core test:  ✓ test/toggle-anchor.test.ts (9 tests) 677ms
+packages/core test: stderr | test/crud.test.ts > 缩放与增删节点（工单04） > zoomToFit：小内容缩放限制为 1，宽内容自动缩小；内容中心必须落在视口中心
+packages/core test: [d3-tree] 数据中存在重复节点 id："d1"、"d2"、"d3"、"d4"、"d5"、"d6"、"d7"、"d8"、"d9"、"d10"；同 id 节点只会渲染一个
+packages/core test:  ✓ test/chart.test.ts (9 tests) 625ms
+packages/core test:  ✓ test/custom-node.test.ts (6 tests) 643ms
+packages/core test:  ✓ test/aggregate.test.ts (6 tests) 651ms
+packages/core test:  ✓ test/collapse.test.ts (10 tests) 636ms
+packages/core test: stderr | test/orientation.test.ts > 布局方向 orientation（工单11） > 垂直：zoomToFit 居中公式按轴独立（对称数据根居中）
+packages/core test: [d3-tree] 数据中存在重复节点 id："d1"、"d2"、"d3"、"d4"、"d5"；同 id 节点只会渲染一个
+packages/core test:  ✓ test/orientation.test.ts (9 tests) 655ms
+packages/core test:  ✓ test/crud.test.ts (7 tests) 589ms
+packages/core test:  ✓ test/fixes.test.ts (7 tests) 583ms
+packages/core test:  ✓ test/visual.test.ts (6 tests) 941ms
+packages/core test:    ✓ 着色 + tooltip + 图例筛选（工单05） > 悬停显示 tooltip：默认渲染名称与 properties 键值并转义 HTML  487ms
+packages/core test:  ✓ test/custom-node-toggle.test.ts (5 tests) 568ms
+packages/core test:    ✓ 自定义节点 data-d3t-toggle 标记区域折叠 > nodeTemplate 标记区域点击切换折叠态，并广播 onNodeToggle  354ms
+packages/core test:  ✓ test/lazy-expand.test.ts (7 tests) 947ms
+packages/core test:  ✓ test/data-update.test.ts (19 tests) 1204ms
+packages/core test:  ✓ test/tooltip.test.ts (46 tests) 1604ms
+packages/core test:  ✓ test/theme.test.ts (3 tests) 194ms
+packages/core test:  ✓ test/i18n.test.ts (3 tests) 256ms
+packages/core test:  ✓ test/fade.test.ts (4 tests) 282ms
+packages/core test:  ✓ test/link-custom.test.ts (5 tests) 303ms
+packages/core test:  ✓ test/lifecycle-regression.test.ts (9 tests) 394ms
+packages/core test:  ✓ test/search-export.test.ts (8 tests) 410ms
+packages/core test:  Test Files  21 passed (21)
+packages/core test:       Tests  189 passed (189)
+packages/core test:    Start at  17:58:54
+packages/core test:    Duration  6.98s (transform 3.60s, setup 0ms, collect 11.57s, tests 13.78s, environment 36.72s, prepare 6.22s)
+packages/core test: Done
+packages/react test$ vitest run
+packages/vue test$ vitest run
+packages/react test:  RUN  v3.2.7 D:/open-ode/d3-tree/packages/react
+packages/vue test:  RUN  v3.2.7 D:/open-ode/d3-tree/packages/vue
+packages/react test:  ✓ test/lifecycle.test.ts (3 tests) 204ms
+packages/react test:  Test Files  1 passed (1)
+packages/react test:       Tests  3 passed (3)
+packages/react test:    Start at  17:59:02
+packages/react test:    Duration  3.12s (transform 408ms, setup 0ms, collect 734ms, tests 204ms, environment 1.34s, prepare 451ms)
+packages/vue test:  ✓ test/lifecycle.test.ts (3 tests) 179ms
+packages/vue test:  Test Files  1 passed (1)
+packages/vue test:       Tests  3 passed (3)
+packages/vue test:    Start at  17:59:02
+packages/vue test:    Duration  3.25s (transform 218ms, setup 0ms, collect 716ms, tests 179ms, environment 1.29s, prepare 356ms)
+packages/react test: Done
+packages/vue test: Done
+
+> d3-tree@0.1.0 build D:\open-ode\d3-tree
+> pnpm -r run build
+
+Scope: 5 of 6 workspace projects
+packages/core build$ tsup
+packages/core build: CLI Building entry: src/index.ts
+packages/core build: CLI Using tsconfig: tsconfig.json
+packages/core build: CLI tsup v8.5.1
+packages/core build: CLI Using tsup config: D:\open-ode\d3-tree\packages\core\tsup.config.ts
+packages/core build: CLI Target: es2022
+packages/core build: CLI Cleaning output folder
+packages/core build: ESM Build start
+packages/core build: CJS Build start
+packages/core build: ESM dist\index.js     47.66 KB
+packages/core build: ESM dist\index.js.map 96.64 KB
+packages/core build: ESM ⚡️ Build success in 26ms
+packages/core build: CJS dist\index.cjs     48.94 KB
+packages/core build: CJS dist\index.cjs.map 97.28 KB
+packages/core build: CJS ⚡️ Build success in 26ms
+packages/core build: DTS Build start
+packages/core build: DTS ⚡️ Build success in 893ms
+packages/core build: DTS dist\index.d.ts  10.73 KB
+packages/core build: DTS dist\index.d.cts 10.73 KB
+packages/core build: Done
+packages/react build$ tsup
+packages/vue build$ tsup
+packages/react build: CLI Building entry: src/index.ts
+packages/react build: CLI Using tsconfig: tsconfig.json
+packages/react build: CLI tsup v8.5.1
+packages/react build: CLI Using tsup config: D:\open-ode\d3-tree\packages\react\tsup.config.ts
+packages/vue build: CLI Building entry: src/index.ts
+packages/vue build: CLI Using tsconfig: tsconfig.json
+packages/vue build: CLI tsup v8.5.1
+packages/vue build: CLI Using tsup config: D:\open-ode\d3-tree\packages\vue\tsup.config.ts
+packages/react build: CLI Target: es2022
+packages/vue build: CLI Target: es2022
+packages/react build: CLI Cleaning output folder
+packages/react build: ESM Build start
+packages/react build: CJS Build start
+packages/vue build: CLI Cleaning output folder
+packages/vue build: ESM Build start
+packages/vue build: CJS Build start
+packages/react build: CJS dist\index.cjs     7.42 KB
+packages/react build: CJS dist\index.cjs.map 14.56 KB
+packages/react build: CJS ⚡️ Build success in 21ms
+packages/react build: ESM dist\index.js     6.19 KB
+packages/react build: ESM dist\index.js.map 14.19 KB
+packages/react build: ESM ⚡️ Build success in 21ms
+packages/vue build: ESM dist\index.js     8.75 KB
+packages/vue build: ESM dist\index.js.map 17.60 KB
+packages/vue build: ESM ⚡️ Build success in 23ms
+packages/vue build: CJS dist\index.cjs     9.90 KB
+packages/vue build: CJS dist\index.cjs.map 17.88 KB
+packages/vue build: CJS ⚡️ Build success in 24ms
+packages/react build: DTS Build start
+packages/vue build: DTS Build start
+packages/react build: DTS ⚡️ Build success in 2035ms
+packages/react build: DTS dist\index.d.ts  3.76 KB
+packages/react build: DTS dist\index.d.cts 3.76 KB
+packages/react build: Done
+packages/vue build: DTS ⚡️ Build success in 2856ms
+packages/vue build: DTS dist\index.d.ts  11.38 KB
+packages/vue build: DTS dist\index.d.cts 11.38 KB
+packages/vue build: Done
+apps/docs build$ vitepress build
+apps/demo build$ vite build
+apps/docs build:   vitepress v1.6.4
+apps/demo build: vite v7.3.7 building client environment for production...
+apps/docs build: - building client + server bundles...
+apps/demo build: transforming...
+apps/demo build: ✓ 264 modules transformed.
+apps/demo build: rendering chunks...
+apps/demo build: computing gzip size...
+apps/demo build: dist/react.html                     0.49 kB │ gzip:  0.33 kB
+apps/demo build: dist/vue.html                       0.56 kB │ gzip:  0.34 kB
+apps/demo build: dist/index.html                     1.83 kB │ gzip:  0.82 kB
+apps/demo build: dist/assets/vue-B5QI5VVr.css        0.36 kB │ gzip:  0.25 kB
+apps/demo build: dist/assets/toolbar-0SnYr41O.css    4.20 kB │ gzip:  1.23 kB
+apps/demo build: dist/assets/main-Da55KvEx.css       6.32 kB │ gzip:  1.67 kB
+apps/demo build: dist/assets/vue-CPjduwJE.js        76.83 kB │ gzip: 29.98 kB
+apps/demo build: dist/assets/data-x9nOWcAU.js       80.29 kB │ gzip: 28.64 kB
+apps/demo build: dist/assets/main-CS_i_a8Y.js      137.01 kB │ gzip: 27.90 kB
+apps/demo build: dist/assets/react-Drr8cOrN.js     231.84 kB │ gzip: 72.71 kB
+apps/demo build: ✓ built in 4.70s
+apps/demo build: Done
+apps/docs build: [32m✓[0m building client + server bundles...
+apps/docs build: - rendering pages...
+apps/docs build: [32m✓[0m rendering pages...
+apps/docs build: build complete in 10.62s.
+apps/docs build: Done

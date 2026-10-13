@@ -1,0 +1,101 @@
+{
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+  "results": [
+    {
+      "shape": "wide",
+      "count": 100,
+      "limit": 5,
+      "visible": 100,
+      "createMs": 7.6,
+      "searchMs": 10.9
+    },
+    {
+      "shape": "wide",
+      "count": 100,
+      "limit": 0,
+      "visible": 100,
+      "createMs": 6.7,
+      "searchMs": 7.5
+    },
+    {
+      "shape": "wide",
+      "count": 1000,
+      "limit": 5,
+      "visible": 1000,
+      "createMs": 48.3,
+      "searchMs": 82.3
+    },
+    {
+      "shape": "wide",
+      "count": 1000,
+      "limit": 0,
+      "visible": 1000,
+      "createMs": 48.6,
+      "searchMs": 78.3
+    },
+    {
+      "shape": "wide",
+      "count": 5000,
+      "limit": 5,
+      "visible": 5000,
+      "createMs": 271.9,
+      "searchMs": 376.1
+    },
+    {
+      "shape": "wide",
+      "count": 5000,
+      "limit": 0,
+      "visible": 5000,
+      "createMs": 227.6,
+      "searchMs": 420.5
+    },
+    {
+      "shape": "balanced",
+      "count": 100,
+      "limit": 5,
+      "visible": 100,
+      "createMs": 6.6,
+      "searchMs": 7.3
+    },
+    {
+      "shape": "balanced",
+      "count": 100,
+      "limit": 0,
+      "visible": 100,
+      "createMs": 5,
+      "searchMs": 10
+    },
+    {
+      "shape": "balanced",
+      "count": 1000,
+      "limit": 5,
+      "visible": 1000,
+      "createMs": 60.1,
+      "searchMs": 80.2
+    },
+    {
+      "shape": "balanced",
+      "count": 1000,
+      "limit": 0,
+      "visible": 1000,
+      "createMs": 51.4,
+      "searchMs": 76.6
+    },
+    {
+      "shape": "balanced",
+      "count": 5000,
+      "limit": 5,
+      "visible": 5000,
+      "createMs": 238.4,
+      "searchMs": 370.5
+    },
+    {
+      "shape": "balanced",
+      "count": 5000,
+      "limit": 0,
+      "visible": 5000,
+      "createMs": 229,
+      "searchMs": 370.3
+    }
+  ]
+}

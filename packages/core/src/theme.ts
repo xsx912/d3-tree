@@ -21,7 +21,7 @@ export const theme = {
   nodeFontSize: 14,
   nodeHeight: 34,
 
-  aggregateText: '#909399',
+  aggregateText: '#606266',
 
   link: '#C0C4CC',
   linkWidth: 1,
@@ -31,7 +31,7 @@ export const theme = {
   badgeRadius: 7,
   badgeFill: '#FFFFFF',
   badgeStroke: '#C0C4CC',
-  badgeText: '#909399',
+  badgeText: '#606266',
 
   font: '"PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif',
 

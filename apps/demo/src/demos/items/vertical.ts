@@ -5,7 +5,7 @@ import type { DemoItem } from '../types'
 export const vertical: DemoItem = {
   id: 'vertical',
   title: '垂直布局',
-  desc: 'orientation 设为 vertical：根在上、子树向下生长（上下分侧），其余能力与水平模式一致。',
+  desc: 'orientation 设为 vertical：根居中、子树向上下两侧展开，其余能力与水平模式一致。',
   setup({ canvas }) {
     const tree = createBidirectionalTree(canvas, {
       data: industryData,

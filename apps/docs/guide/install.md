@@ -2,7 +2,8 @@
 
 ## 环境要求
 
-- Node.js ≥ 18，pnpm ≥ 9（npm/yarn 亦可）
+- 仓库开发：Node.js 22.20+（22.x）或 ≥24.12，pnpm 10.15.0；冻结锁文件安装用 `pnpm install --frozen-lockfile`
+- 此版本要求来自开发/构建工具；消费库使用自己的打包环境，并满足 Vue 3 或 React 18/19 peer 依赖
 - 核心依赖 d3 v7 由 `@d3-tree/core` 自带；Vue / React 封装要求对应框架为 peer 依赖
 
 ## 安装
@@ -18,7 +19,9 @@ pnpm add @d3-tree/vue @d3-tree/core vue
 pnpm add @d3-tree/react @d3-tree/core react react-dom
 ```
 
-> 本仓库尚未发布到 npm registry（见规格的 Out of Scope）。现阶段可通过 `file:` 协议本地接入：先在本仓库执行 `pnpm build`，再在你的项目中 `pnpm add file:D:/open-ode/d3-tree/packages/core`。若需发布私有 registry，运行 `pnpm -r build && pnpm publish` 即可。
+> 本仓库尚未发布到 npm registry（见规格的 Out of Scope）。以上 registry 命令供发布后使用；现阶段先在本仓库执行 `pnpm build`，再在消费项目中 `pnpm add file:D:/open-ode/d3-tree/packages/core`（封装包与 core 一并本地接入）。
+
+维护者发布使用 Changesets：创建 changeset，执行 `pnpm changeset:version` 更新各包版本，再构建并执行 `pnpm changeset:publish`；根包、demo、docs 为 private，不发布。默认自动化流程见 CONTRIBUTING.md。私有 registry 需先配置对应作用域 registry 和认证，在维护者环境完成发布；npm provenance 仅用于支持它的 registry，不能照搬到私有服务。本轮修复不执行发布。
 
 ## 原生接入
 
@@ -84,7 +87,7 @@ export function Chart({ data }) {
 }
 ```
 
-`data` 变化走 `setData` 保留实例；其余配置 props 变化自动重建；事件回调始终读最新闭包。
+`data` 变化走 `setData` 保留实例和缩放、清除搜索及旧加载状态。React 悬停回调身份更新保持实例并读取最新闭包，`toggleOnNodeClick` 热更新；自接管模式切换和其他配置变更重建。Vue 点击开关热更新，条件插槽有无变化重建并安全回退。
 
 ## 数据模型
 

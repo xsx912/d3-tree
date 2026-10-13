@@ -1,12 +1,5 @@
 import { hierarchy, tree } from 'd3-hierarchy'
-import type {
-  LinkStyle,
-  NodeSizeFn,
-  NodeVariant,
-  Orientation,
-  Side,
-  TreeNodeData,
-} from './types'
+import type { LinkStyle, NodeSizeFn, NodeVariant, Orientation, Side, TreeNodeData } from './types'
 
 /**
  * 双向树布局引擎（纯函数）。
@@ -34,7 +27,7 @@ export interface AggregateConfig {
 }
 
 export interface LayoutNode {
-  /** d3.join 的 key：数据 id（聚合虚拟节点用合成 key） */
+  /** 独立于公共数据 ID 的、带节点类型的内部 key */
   key: string
   data: TreeNodeData
   variant: 'root' | 'node' | 'aggregate'
@@ -48,6 +41,14 @@ export interface LayoutNode {
   /** 中心点垂直坐标 */
   y: number
   parentId: string
+}
+
+export function nodeKey(id: string, variant: 'node' | 'root' = 'node'): string {
+  return JSON.stringify([variant, id])
+}
+
+export function aggregateKey(parentId: string): string {
+  return JSON.stringify(['aggregate', parentId])
 }
 
 export interface LayoutLink {
@@ -107,7 +108,7 @@ function buildDisplay(
   // 分组过滤先行：聚合的“剩余数”只统计过滤后仍应可见的子节点，避免把被过滤节点计入“展开 (N)”
   const allChildren = node.children ?? []
   const children = visibleGroups
-    ? allChildren.filter(c => !c.group || visibleGroups.has(c.group))
+    ? allChildren.filter((c) => !c.group || visibleGroups.has(c.group))
     : allChildren
   if (!collapsedIds.has(node.id) && children.length) {
     let visible = children
@@ -130,7 +131,7 @@ function buildDisplay(
       }
     }
     const childNodes = visible
-      .map(c => buildDisplay(c, collapsedIds, agg, side, visibleGroups, orientation))
+      .map((c) => buildDisplay(c, collapsedIds, agg, side, visibleGroups, orientation))
       .filter((n): n is DisplayNode => n !== null)
     return {
       original: node,
@@ -144,11 +145,7 @@ function buildDisplay(
 const SIBLING_MIN_GAP = 12
 
 /** 兄弟轴上的节点尺寸：水平模式兄弟沿 y（用高度），垂直模式兄弟沿 x（用宽度） */
-function siblingAxisSpan(
-  node: DisplayNode,
-  nodeSize: NodeSizeFn,
-  vertical: boolean,
-): number {
+function siblingAxisSpan(node: DisplayNode, nodeSize: NodeSizeFn, vertical: boolean): number {
   const variant: NodeVariant = node.aggregate === true ? 'aggregate' : 'node'
   const s = nodeSize(node.original, variant)
   return vertical ? s.width : s.height
@@ -182,7 +179,7 @@ export function computeLayout(
 
   const rootSize = nodeSize(rootData, 'root')
   const rootNode: LayoutNode = {
-    key: rootData.id,
+    key: nodeKey(rootData.id, 'root'),
     data: rootData,
     variant: 'root',
     name: rootData.name,
@@ -207,10 +204,10 @@ export function computeLayout(
     const synthetic: DisplayNode = {
       original: rootData,
       children: sideChildren
-        .map(c => buildDisplay(c, collapsedIds, agg, side, visibleGroups, orientation))
+        .map((c) => buildDisplay(c, collapsedIds, agg, side, visibleGroups, orientation))
         .filter((n): n is DisplayNode => n !== null),
     }
-    const h = hierarchy<DisplayNode>(synthetic, d => d.children)
+    const h = hierarchy<DisplayNode>(synthetic, (d) => d.children)
     const laidOut = tree<DisplayNode>()
       .nodeSize([rowHeight, 1])
       // 相邻中心距需覆盖两节点在兄弟轴上的半尺寸和 + 最小间隙；不足 rowHeight 时钳回 1
@@ -231,7 +228,7 @@ export function computeLayout(
       return vertical ? s.height : s.width
     }
     const colMax = new Map<number, number>()
-    laidOut.each(n => {
+    laidOut.each((n) => {
       if (n.depth === 0) return
       const variant: LayoutNode['variant'] = n.data.aggregate === true ? 'aggregate' : 'node'
       const size = depthAxis(n.data.original, variant)
@@ -244,7 +241,7 @@ export function computeLayout(
       edge += (colMax.get(depth) ?? 0) + columnGap
     }
 
-    laidOut.each(n => {
+    laidOut.each((n) => {
       if (n.depth === 0) return
       const d = n.data.original
       const variant: LayoutNode['variant'] = n.data.aggregate === true ? 'aggregate' : 'node'
@@ -256,7 +253,7 @@ export function computeLayout(
         n.parent && n.parent.depth === 0 ? rootData.id : (n.parent?.data.original.id ?? rootData.id)
 
       const node: LayoutNode = {
-        key: d.id,
+        key: variant === 'aggregate' ? aggregateKey(parentId) : nodeKey(d.id),
         data: d,
         variant,
         name: d.name,
@@ -272,8 +269,9 @@ export function computeLayout(
       nodes.push(node)
       byId.set(node.key, node)
 
-      const parent = byId.get(parentId)
-      if (parent) links.push({ id: `${parent.key}->${node.key}`, source: parent, target: node })
+      const parent = byId.get(n.parent?.depth === 0 ? rootNode.key : nodeKey(parentId))
+      if (parent)
+        links.push({ id: JSON.stringify([parent.key, node.key]), source: parent, target: node })
     })
   }
 

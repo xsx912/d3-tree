@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createBidirectionalTree } from '../src'
 import type { TreeNodeData, TreeInstance, TooltipContext } from '../src'
 
@@ -31,7 +31,10 @@ function fixture(): TreeNodeData {
   }
 }
 
-function mount(data: TreeNodeData, extra: Record<string, unknown> = {}): {
+function mount(
+  data: TreeNodeData,
+  extra: Record<string, unknown> = {},
+): {
   container: HTMLElement
   tree: TreeInstance
 } {
@@ -64,7 +67,14 @@ function tooltipEl(container: HTMLElement): HTMLDivElement {
 /** 与 core 默认值对齐：防抖延时 + 淡出时长后彻底隐藏 */
 const HIDE_DELAY = 150
 const FADE_DURATION = 150
-const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
+const sleep = async (ms: number): Promise<void> => {
+  await vi.advanceTimersByTimeAsync(ms)
+}
+beforeEach(() => vi.useFakeTimers())
+afterEach(() => {
+  vi.clearAllTimers()
+  vi.useRealTimers()
+})
 async function settleHide(): Promise<void> {
   await sleep(HIDE_DELAY + FADE_DURATION + 60)
 }
@@ -82,7 +92,7 @@ class FakeResizeObserver {
     this.observed.push(el)
   }
   unobserve(el: Element): void {
-    this.observed = this.observed.filter(e => e !== el)
+    this.observed = this.observed.filter((e) => e !== el)
   }
   disconnect(): void {
     this.observed = []
@@ -179,10 +189,7 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
     const formatter = vi.fn(() => 'x')
     const data = fixture()
     // 甲板块 4 个子节点、上限 2 → 其下出现聚合节点（根的直接子节点只分侧、不聚合）
-    data.children![0]!.children!.push(
-      { id: 'a3', name: '甲三' },
-      { id: 'a4', name: '甲四' },
-    )
+    data.children![0]!.children!.push({ id: 'a3', name: '甲三' }, { id: 'a4', name: '甲四' })
     const { container } = mount(data, { tooltip: { formatter }, visibleChildrenLimit: 2 })
 
     const agg = container.querySelector<SVGGElement>('g.d3t-node--aggregate')
@@ -578,7 +585,7 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
 
         height = 120
         card.textContent = '详情多行内容'
-        const ro = FakeResizeObserver.instances.find(r => r.observed.includes(tip))
+        const ro = FakeResizeObserver.instances.find((r) => r.observed.includes(tip))
         expect(ro, '应创建 ResizeObserver 监听悬浮层').toBeTruthy()
         ro!.trigger() // 模拟浏览器通知：内容尺寸变化
 
@@ -618,7 +625,7 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
         hover(nodeById(container, 'a'))
         const before = tip.style.top
 
-        const ro = FakeResizeObserver.instances.find(r => r.observed.includes(tip))
+        const ro = FakeResizeObserver.instances.find((r) => r.observed.includes(tip))
         expect(ro, '悬浮层监听应存在').toBeTruthy()
         tree.destroy()
         expect(ro!.observed).toHaveLength(0) // disconnect 清空观察目标
@@ -663,10 +670,7 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
     it('聚合节点照发事件（aggregate: true，调用端自行区分）', () => {
       const onNodeHover = vi.fn()
       const data = fixture()
-      data.children![0]!.children!.push(
-        { id: 'a3', name: '甲三' },
-        { id: 'a4', name: '甲四' },
-      )
+      data.children![0]!.children!.push({ id: 'a3', name: '甲三' }, { id: 'a4', name: '甲四' })
       const { container } = mount(data, { onNodeHover, visibleChildrenLimit: 2 })
 
       const agg = container.querySelector<SVGGElement>('g.d3t-node--aggregate')!

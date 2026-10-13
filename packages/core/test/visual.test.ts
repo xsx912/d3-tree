@@ -22,13 +22,22 @@ function fixture(): TreeNodeData {
           { id: 'a2', name: '甲二', group: 'A' },
         ],
       },
-      { id: 'b', name: '乙板块', side: 'right', group: 'B', children: [{ id: 'b1', name: '乙一', group: 'B' }] },
+      {
+        id: 'b',
+        name: '乙板块',
+        side: 'right',
+        group: 'B',
+        children: [{ id: 'b1', name: '乙一', group: 'B' }],
+      },
       { id: 'c', name: '丙板块', side: 'right' },
     ],
   }
 }
 
-function mount(data: TreeNodeData, extra: Record<string, unknown> = {}): {
+function mount(
+  data: TreeNodeData,
+  extra: Record<string, unknown> = {},
+): {
   container: HTMLElement
   tree: TreeInstance
 } {
@@ -47,16 +56,17 @@ function hover(el: Element, type: 'mouseenter' | 'mouseleave'): void {
 }
 
 describe('着色 + tooltip + 图例筛选（工单05）', () => {
-  it('colorByGroup：同组同色、异组异色、根节点不受影响、分色节点白字', () => {
+  it('colorByGroup：同组同色、异组异色、根节点不受影响、分色节点高对比字', () => {
     const { container } = mount(fixture(), { colorByGroup: true })
-    const fill = (id: string) => container.querySelector(`g[data-id="${id}"] rect`)!.getAttribute('fill')
+    const fill = (id: string) =>
+      container.querySelector(`g[data-id="${id}"] rect`)!.getAttribute('fill')
     expect(fill('a')).toBe(fill('a1'))
     expect(fill('a')).not.toBe(fill('b'))
     expect(fill('root')).toBe('#1E6EFF')
     // 分色节点文字为白色，根白字，无分组节点深灰
     const textColor = (id: string) =>
       container.querySelector(`g[data-id="${id}"] text.d3t-label`)!.getAttribute('fill')
-    expect(textColor('a')).toBe('#FFFFFF')
+    expect(textColor('a')).toBe('#000000')
     expect(textColor('c')).toBe('#303133')
     // 节点携带分组类名
     expect(container.querySelector('g[data-id="a"]')!.classList.contains('d3t-group--A')).toBe(true)
@@ -75,7 +85,7 @@ describe('着色 + tooltip + 图例筛选（工单05）', () => {
     mount(fixture(), { colorByGroup: true, onGroupsChange })
     expect(onGroupsChange).toHaveBeenCalledTimes(1)
     const groups = onGroupsChange.mock.calls[0]![0] as Array<{ name: string; color: string }>
-    expect(groups.map(g => g.name)).toEqual(['A', 'B'])
+    expect(groups.map((g) => g.name)).toEqual(['A', 'B'])
     expect(groups[0]!.color).toMatch(/^#/)
   })
 
@@ -95,7 +105,7 @@ describe('着色 + tooltip + 图例筛选（工单05）', () => {
 
     hover(container.querySelector('g[data-id="a"]')!, 'mouseleave')
     // 移出走防抖延迟 + 淡出（给移入弹窗留时间），两者完成后才隐藏
-    await new Promise(resolve => setTimeout(resolve, 360))
+    await new Promise((resolve) => setTimeout(resolve, 360))
     expect(tooltip.style.display).toBe('none')
   })
 

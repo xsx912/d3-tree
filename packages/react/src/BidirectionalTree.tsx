@@ -155,19 +155,21 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       tooltipFadeDuration,
       loadChildren,
       toggleOnNodeClick,
-      onNodeHover,
-      onNodeHoverEnd,
       measureText,
       theme: themeOverride,
       texts,
     } = props
+    const selfManaged = !!props.onNodeHover
     useEffect(() => {
       if (!hostRef.current) return
       // 任一悬浮框定制项存在即组装配置对象（延时/时长不影响内容，也允许单独配置）
       const hasTooltipConfig = !!(
-        renderTooltip || tooltipFormatter || tooltipClassName
-        || tooltipShowDelay !== undefined
-        || tooltipHideDelay !== undefined || tooltipFadeDuration !== undefined
+        renderTooltip ||
+        tooltipFormatter ||
+        tooltipClassName ||
+        tooltipShowDelay !== undefined ||
+        tooltipHideDelay !== undefined ||
+        tooltipFadeDuration !== undefined
       )
       const options: TreeOptions = {
         data: propsRef.current.data,
@@ -187,7 +189,8 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
         nodeTemplate,
         nodeColor,
         // 自接管模式（onNodeHover）优先：配置即停用内置悬浮框（含 renderTooltip）
-        tooltip: hasTooltipConfig && !onNodeHover
+        tooltip:
+          hasTooltipConfig && !selfManaged
             ? {
                 // render-prop 优先于 tooltipFormatter（更富的表达）
                 formatter: renderTooltip
@@ -204,7 +207,7 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
                       layer.root.render(renderTooltip(node, ctx))
                       return layer.host
                     }
-                  : tooltipFormatter ?? undefined,
+                  : (tooltipFormatter ?? undefined),
                 className: tooltipClassName ?? undefined,
                 showDelay: tooltipShowDelay ?? undefined,
                 hideDelay: tooltipHideDelay ?? undefined,
@@ -216,22 +219,20 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
             : undefined,
         loadChildren,
         onLoadError: (error, parent) => propsRef.current.onLoadError?.(error, parent),
-        toggleOnNodeClick,
+        toggleOnNodeClick: propsRef.current.toggleOnNodeClick,
         measureText,
         theme: themeOverride,
         texts,
-        onNodeClick: node => propsRef.current.onNodeClick?.(node),
+        onNodeClick: (node) => propsRef.current.onNodeClick?.(node),
         onNodeToggle: (node, collapsed) => propsRef.current.onNodeToggle?.(node, collapsed),
-        onNodeSelect: node => propsRef.current.onNodeSelect?.(node),
+        onNodeSelect: (node) => propsRef.current.onNodeSelect?.(node),
         // 悬停事件缝（自接管）：仅当调用端传入时启用（配置即停用内置悬浮框），
         // 不能恒传包装函数——core 以 onNodeHover 是否存在判定模式
-        onNodeHover: onNodeHover
+        onNodeHover: selfManaged
           ? (node, ctx) => propsRef.current.onNodeHover?.(node, ctx)
           : undefined,
-        onNodeHoverEnd: onNodeHoverEnd
-          ? (node) => propsRef.current.onNodeHoverEnd?.(node)
-          : undefined,
-        onGroupsChange: groups => propsRef.current.onGroupsChange?.(groups),
+        onNodeHoverEnd: selfManaged ? (node) => propsRef.current.onNodeHoverEnd?.(node) : undefined,
+        onGroupsChange: (groups) => propsRef.current.onGroupsChange?.(groups),
       }
       optionsRef.current = options
       chartRef.current = createBidirectionalTree(hostRef.current, options)
@@ -269,14 +270,16 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
       tooltipShowDelay,
       tooltipHideDelay,
       tooltipFadeDuration,
-      onNodeHover,
-      onNodeHoverEnd,
+      selfManaged,
       loadChildren,
-      toggleOnNodeClick,
       measureText,
       themeOverride,
       texts,
     ])
+
+    useEffect(() => {
+      if (optionsRef.current) optionsRef.current.toggleOnNodeClick = toggleOnNodeClick
+    }, [toggleOnNodeClick])
 
     // data 变化 → setData（保持实例与折叠/搜索状态语义由 core 处理）
     const data = props.data
@@ -292,18 +295,18 @@ export const BidirectionalTree = forwardRef<BidirectionalTreeHandle, Bidirection
     useImperativeHandle(
       ref,
       () => ({
-        toggle: id => chartRef.current?.toggle(id),
+        toggle: (id) => chartRef.current?.toggle(id),
         expandAll: () => chartRef.current?.expandAll(),
         collapseAll: () => chartRef.current?.collapseAll(),
         addChild: (parentId, node, side) =>
           chartRef.current?.addChild(parentId, node, side) ?? false,
-        removeChild: id => chartRef.current?.removeChild(id) ?? false,
+        removeChild: (id) => chartRef.current?.removeChild(id) ?? false,
         zoomToFit: () => chartRef.current?.zoomToFit(),
-        setVisibleGroups: groups => chartRef.current?.setVisibleGroups(groups),
-        search: keyword => chartRef.current?.search(keyword) ?? 0,
+        setVisibleGroups: (groups) => chartRef.current?.setVisibleGroups(groups),
+        search: (keyword) => chartRef.current?.search(keyword) ?? 0,
         clearSearch: () => chartRef.current?.clearSearch(),
-        exportImage: options => chartRef.current?.exportImage(options) ?? Promise.resolve(),
-        setToggleOnNodeClick: enabled => {
+        exportImage: (options) => chartRef.current?.exportImage(options) ?? Promise.resolve(),
+        setToggleOnNodeClick: (enabled) => {
           if (optionsRef.current) optionsRef.current.toggleOnNodeClick = enabled
         },
       }),

@@ -6,7 +6,7 @@ export const verticalSources: DemoSources = {
 <head>
   <meta charset="UTF-8" />
   <title>垂直布局 · d3-tree</title>
-  <!-- 在 Vite 等打包工程中运行：npm i @d3-tree/core，与 data.ts 放同一目录 -->
+  <!-- 在 Vite 等打包工程中运行：未发布时用 file: 接入本地 @d3-tree/core（见安装文档），与 data.ts 放同一目录 -->
   <style>
     html, body { height: 100%; margin: 0; }
     #tree { width: 100%; height: 100%; }
@@ -18,7 +18,7 @@ export const verticalSources: DemoSources = {
     import { createBidirectionalTree } from '@d3-tree/core'
     import { industryData } from './data'
 
-    // orientation: 'vertical' —— 根在上、子树向下生长（上下分侧）
+    // orientation: 'vertical' —— 根居中、子树向上下两侧展开
     const tree = createBidirectionalTree(document.getElementById('tree')!, {
       data: industryData,
       colorByGroup: true,
@@ -42,7 +42,7 @@ onMounted(() => tree.value?.zoomToFit())
 
 <template>
   <div class="page">
-    <!-- orientation: 'vertical' —— 根在上、子树向下生长（上下分侧） -->
+    <!-- orientation: 'vertical' —— 根居中、子树向上下两侧展开 -->
     <BidirectionalTree ref="tree" :data="industryData" color-by-group
       orientation="vertical" />
   </div>
@@ -66,7 +66,7 @@ export default function BidirectionalTreeDemo() {
 
   return (
     <div style={{ width: '100%', height: '100vh' }}>
-      {/* orientation="vertical" —— 根在上、子树向下生长（上下分侧） */}
+      {/* orientation="vertical" —— 根居中、子树向上下两侧展开 */}
       <BidirectionalTree ref={tree} data={industryData} colorByGroup orientation="vertical" />
     </div>
   )

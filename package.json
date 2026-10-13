@@ -28,6 +28,6 @@
     "typescript-eslint": "^8.46.0"
   },
   "engines": {
-    "node": ">=18"
+    "node": "^22.20.0 || >=24.12.0"
   }
 }

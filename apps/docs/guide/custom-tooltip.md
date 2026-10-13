@@ -55,6 +55,8 @@ interface TooltipContext {
   depth: number                    // 深度（根为 0）
   side: 'left' | 'right' | 'center'
   collapsed: boolean               // 本地子级已折叠不显示（与"未加载"区分）
+  element: SVGGElement              // 节点元素，供外部悬浮框锚定
+  aggregate: boolean               // 是否聚合节点（自接管模式照发事件）
 }
 ```
 
@@ -83,6 +85,8 @@ tooltip: { className: 'biz-tip' }
 ```
 
 插槽与 `tooltipFormatter` 同时提供时插槽优先。
+
+条件增加/删除插槽会重建图表并释放旧宿主；仅更新已有插槽内容保持单实例语义。删除后回退 `tooltipFormatter` 或默认内容。
 
 ## React：renderTooltip render-prop
 

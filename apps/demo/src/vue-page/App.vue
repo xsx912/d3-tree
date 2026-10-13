@@ -81,6 +81,16 @@ function onGroupsChange(gs: Array<{ name: string; color: string }>): void {
   activeGroups.value = new Set(gs.map(g => g.name))
 }
 
+async function exportGraph(format: 'svg' | 'png'): Promise<void> {
+  hint.value = `正在导出 ${format.toUpperCase()}…`
+  try {
+    await tree.value?.exportImage({ format, scale: 2, filename: '产业链图谱-Vue' })
+    hint.value = `已导出 ${format.toUpperCase()}`
+  } catch (error) {
+    hint.value = `导出失败：${error instanceof Error ? error.message : String(error)}`
+  }
+}
+
 // ---- 悬浮框实例缓存验证（#tooltip 插槽 + tooltipCache 开关） ----
 const tooltipCache = ref(true)
 const tipShowDelay = ref(0)
@@ -172,8 +182,8 @@ const TooltipCard = defineComponent({
     <div class="tb-group" role="group" aria-label="导出">
       <span class="tb-label">导出</span>
       <div class="tb-controls">
-        <button @click="tree?.exportImage({ format: 'svg', filename: '产业链图谱-Vue' })">SVG</button>
-        <button @click="tree?.exportImage({ format: 'png', scale: 2, filename: '产业链图谱-Vue' })">PNG</button>
+        <button @click="exportGraph('svg')">SVG</button>
+        <button @click="exportGraph('png')">PNG</button>
       </div>
     </div>
     <span class="divider"></span>

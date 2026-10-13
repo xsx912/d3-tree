@@ -6,7 +6,7 @@ export const themeTextsSources: DemoSources = {
 <head>
   <meta charset="UTF-8" />
   <title>主题与国际化 · d3-tree</title>
-  <!-- 在 Vite 等打包工程中运行：npm i @d3-tree/core，与 data.ts 放同一目录 -->
+  <!-- 在 Vite 等打包工程中运行：未发布时用 file: 接入本地 @d3-tree/core（见安装文档），与 data.ts 放同一目录 -->
   <style>
     html, body { height: 100%; margin: 0; }
     #tree { width: 100%; height: 100%; background: #0F172A; }

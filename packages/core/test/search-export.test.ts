@@ -25,7 +25,10 @@ function fixture(): TreeNodeData {
   }
 }
 
-function mount(data: TreeNodeData, extra: Record<string, unknown> = {}): {
+function mount(
+  data: TreeNodeData,
+  extra: Record<string, unknown> = {},
+): {
   container: HTMLElement
   tree: TreeInstance
 } {
@@ -61,8 +64,12 @@ describe('搜索高亮定位（工单06）', () => {
     expect(container.querySelector('g[data-id="a1"]')).toBeTruthy()
     expect(container.querySelector('g[data-id="a1"]')!.classList.contains('d3t-hit')).toBe(true)
     // 祖先链：root、a
-    expect(container.querySelector('g[data-id="a"]')!.classList.contains('d3t-hit-ancestor')).toBe(true)
-    expect(container.querySelector('g[data-id="root"]')!.classList.contains('d3t-dimmed')).toBe(false)
+    expect(container.querySelector('g[data-id="a"]')!.classList.contains('d3t-hit-ancestor')).toBe(
+      true,
+    )
+    expect(container.querySelector('g[data-id="root"]')!.classList.contains('d3t-dimmed')).toBe(
+      false,
+    )
     // 非相关节点淡化
     expect(container.querySelector('g[data-id="b"]')!.classList.contains('d3t-dimmed')).toBe(true)
   })
@@ -127,7 +134,9 @@ describe('导出 PNG/SVG（工单06）', () => {
   beforeEach(() => {
     downloads.length = 0
     blobs.length = 0
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
       downloads.push({ href: this.href, download: this.download })
     })
     vi.stubGlobal(
@@ -162,7 +171,7 @@ describe('导出 PNG/SVG（工单06）', () => {
     expect(text).toMatch(/viewBox=/)
   })
 
-  it('导出 PNG：SVG 转 canvas 后以 data URL 下载', async () => {
+  it('导出 PNG：SVG 转 canvas 后以 Blob URL 下载', async () => {
     // mock Image：src 赋值即异步触发 onload
     class FakeImage {
       onload: (() => void) | null = null
@@ -173,20 +182,23 @@ describe('导出 PNG/SVG（工单06）', () => {
     }
     vi.stubGlobal('Image', FakeImage)
     const drawImage = vi.fn()
-    const toDataURL = vi.fn(() => 'data:image/png;base64,FAKEPNG')
+    const toBlob = vi.fn((callback: BlobCallback) =>
+      callback(new Blob(['PNG'], { type: 'image/png' })),
+    )
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
       fillRect: vi.fn(),
       drawImage,
     } as unknown as CanvasRenderingContext2D)
-    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockImplementation(toDataURL)
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(toBlob)
 
     const { tree } = mount(fixture())
     await tree.exportImage({ format: 'png', scale: 2, filename: '图谱' })
 
-    expect(toDataURL).toHaveBeenCalledWith('image/png')
+    expect(toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/png')
     expect(downloads).toHaveLength(1)
     expect(downloads[0]!.download).toBe('图谱.png')
-    expect(downloads[0]!.href.startsWith('data:image/png')).toBe(true)
+    expect(downloads[0]!.href.startsWith('blob:')).toBe(true)
+    expect(blobs[1]!.type).toBe('image/png')
     // 画布尺寸为内容 × scale（fixedMeasure 下包围盒 > 0）
     const canvasCalls = drawImage.mock.calls
     expect(canvasCalls.length).toBeGreaterThan(0)

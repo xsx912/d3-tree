@@ -4,6 +4,7 @@ import {
   h,
   onBeforeUnmount,
   onMounted,
+  onUpdated,
   ref,
   render,
   watch,
@@ -149,6 +150,7 @@ export const BidirectionalTree = defineComponent({
     let chart: TreeInstance | null = null
     let currentOptions: TreeOptions | null = null
     let toggleFlag = props.toggleOnNodeClick !== false
+    let hadTooltipSlot = !!slots.tooltip
 
     // ---- #tooltip 作用域插槽：单实例宿主（常驻挂载，hover 只换 props，移出仅隐藏不卸载） ----
     const instance = getCurrentInstance()
@@ -161,9 +163,7 @@ export const BidirectionalTree = defineComponent({
         ctx: { type: Object as PropType<TooltipContext>, required: true },
       },
       render() {
-        return (
-          slots.tooltip as (props: { node: TreeNodeData; ctx: TooltipContext }) => unknown[]
-        )({ node: this.node, ctx: this.ctx })
+        return slots.tooltip?.({ node: this.node, ctx: this.ctx }) ?? null
       },
     })
 
@@ -185,11 +185,15 @@ export const BidirectionalTree = defineComponent({
 
     function create(): void {
       if (!host.value) return
+      hadTooltipSlot = !!slots.tooltip
       // 任一悬浮框定制项存在即组装配置对象（延时/时长不影响内容，也允许单独配置）
       const hasTooltipConfig = !!(
-        slots.tooltip || props.tooltipFormatter || props.tooltipClassName
-        || props.tooltipShowDelay !== undefined
-        || props.tooltipHideDelay !== undefined || props.tooltipFadeDuration !== undefined
+        slots.tooltip ||
+        props.tooltipFormatter ||
+        props.tooltipClassName ||
+        props.tooltipShowDelay !== undefined ||
+        props.tooltipHideDelay !== undefined ||
+        props.tooltipFadeDuration !== undefined
       )
       currentOptions = {
         data: props.data,
@@ -209,32 +213,35 @@ export const BidirectionalTree = defineComponent({
         nodeTemplate: props.nodeTemplate ?? undefined,
         nodeColor: props.nodeColor ?? undefined,
         // 自接管模式（@node-hover）优先：配置即停用内置悬浮框（含 #tooltip 插槽）
-        tooltip: hasTooltipConfig && !props.onNodeHover
-          ? {
-              // 插槽优先于 tooltipFormatter（更富的表达）；两者都返回元素给 core 挂载
-              formatter: slots.tooltip ? renderTooltipSlot : props.tooltipFormatter ?? undefined,
+        tooltip:
+          hasTooltipConfig && !props.onNodeHover
+            ? {
+                // 插槽优先于 tooltipFormatter（更富的表达）；两者都返回元素给 core 挂载
+                formatter: slots.tooltip
+                  ? renderTooltipSlot
+                  : (props.tooltipFormatter ?? undefined),
                 className: props.tooltipClassName ?? undefined,
                 showDelay: props.tooltipShowDelay ?? undefined,
                 hideDelay: props.tooltipHideDelay ?? undefined,
-              fadeDuration: props.tooltipFadeDuration ?? undefined,
-              // 关闭实例缓存：隐藏即卸载插槽内容（换节点直切由 formatter 内先卸载保证）
-              onTooltipHide:
-                slots.tooltip && props.tooltipCache === false ? unmountTooltipSlot : undefined,
-            }
-          : undefined,
+                fadeDuration: props.tooltipFadeDuration ?? undefined,
+                // 关闭实例缓存：隐藏即卸载插槽内容（换节点直切由 formatter 内先卸载保证）
+                onTooltipHide:
+                  slots.tooltip && props.tooltipCache === false ? unmountTooltipSlot : undefined,
+              }
+            : undefined,
         loadChildren: props.loadChildren ?? undefined,
         onLoadError: (error, parent) => emit('load-error', error, parent),
         measureText: props.measureText,
         theme: props.theme ?? undefined,
         texts: props.texts ?? undefined,
         toggleOnNodeClick: toggleFlag,
-        onNodeClick: node => emit('node-click', node),
+        onNodeClick: (node) => emit('node-click', node),
         onNodeToggle: (node, collapsed) => emit('node-toggle', node, collapsed),
-        onNodeSelect: node => emit('node-select', node),
+        onNodeSelect: (node) => emit('node-select', node),
         // 悬停事件缝（自接管悬浮框）：透传（core 以是否配置判定模式；配置即停用内置）
         onNodeHover: props.onNodeHover ?? undefined,
         onNodeHoverEnd: props.onNodeHoverEnd ?? undefined,
-        onGroupsChange: groups => emit('groups-change', groups),
+        onGroupsChange: (groups) => emit('groups-change', groups),
       }
       chart = createBidirectionalTree(host.value, currentOptions)
     }
@@ -252,11 +259,18 @@ export const BidirectionalTree = defineComponent({
 
     onMounted(create)
     onBeforeUnmount(destroy)
+    // slots 非响应式；父组件更新条件插槽后，在组件更新周期同步配置。
+    onUpdated(() => {
+      if (hadTooltipSlot !== !!slots.tooltip) {
+        destroy()
+        create()
+      }
+    })
 
     // data 原地替换走 setData（保持动画与折叠状态语义由 core 处理）
     watch(
       () => props.data,
-      data => {
+      (data) => {
         if (data) chart?.setData(data)
       },
     )
@@ -264,7 +278,7 @@ export const BidirectionalTree = defineComponent({
     // 交互开关热更新（不重建实例）
     watch(
       () => props.toggleOnNodeClick,
-      v => {
+      (v) => {
         toggleFlag = v !== false
         if (currentOptions) currentOptions.toggleOnNodeClick = toggleFlag
       },
@@ -308,17 +322,17 @@ export const BidirectionalTree = defineComponent({
     )
 
     const exposed: BidirectionalTreeExposed = {
-      toggle: id => chart?.toggle(id),
+      toggle: (id) => chart?.toggle(id),
       expandAll: () => chart?.expandAll(),
       collapseAll: () => chart?.collapseAll(),
       addChild: (parentId, node, side) => chart?.addChild(parentId, node, side) ?? false,
-      removeChild: id => chart?.removeChild(id) ?? false,
+      removeChild: (id) => chart?.removeChild(id) ?? false,
       zoomToFit: () => chart?.zoomToFit(),
-      setVisibleGroups: groups => chart?.setVisibleGroups(groups),
-      search: keyword => chart?.search(keyword) ?? 0,
+      setVisibleGroups: (groups) => chart?.setVisibleGroups(groups),
+      search: (keyword) => chart?.search(keyword) ?? 0,
       clearSearch: () => chart?.clearSearch(),
-      exportImage: options => chart?.exportImage(options) ?? Promise.resolve(),
-      setToggleOnNodeClick: enabled => {
+      exportImage: (options) => chart?.exportImage(options) ?? Promise.resolve(),
+      setToggleOnNodeClick: (enabled) => {
         toggleFlag = enabled
         if (currentOptions) currentOptions.toggleOnNodeClick = enabled
       },

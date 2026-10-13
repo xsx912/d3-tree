@@ -25,7 +25,10 @@ function fixture(): TreeNodeData {
   }
 }
 
-function mount(data: TreeNodeData, extra: Record<string, unknown> = {}): {
+function mount(
+  data: TreeNodeData,
+  extra: Record<string, unknown> = {},
+): {
   container: HTMLElement
   tree: TreeInstance
 } {
@@ -61,12 +64,30 @@ describe('可访问性基线（ARIA + 键盘）', () => {
     expect(leaf.getAttribute('aria-expanded')).toBeNull()
   })
 
-  it('聚合节点为 button；徽标 aria-hidden 避免重复 Tab 停留', () => {
+  it('聚合操作作为 treeitem；徽标 aria-hidden 避免重复 Tab 停留', () => {
     const { container } = mount(fixture())
-    expect(node(container, '__agg__a').getAttribute('role')).toBe('button')
+    expect(node(container, '__agg__a').getAttribute('role')).toBe('treeitem')
     expect(node(container, 'a').querySelector('g.d3t-badge')!.getAttribute('aria-hidden')).toBe(
       'true',
     )
+  })
+
+  it('平铺节点由 tree 拥有，显式层级和同层位置在更新后保持正确', () => {
+    const { container, tree } = mount(fixture())
+    const owner = container.querySelector('[role="tree"]')
+    expect(owner).toBeTruthy()
+    for (const item of container.querySelectorAll('[role="treeitem"]'))
+      expect(item.closest('[role="tree"]')).toBe(owner)
+    expect(node(container, 'root').getAttribute('aria-level')).toBe('1')
+    expect(node(container, 'a').getAttribute('aria-level')).toBe('2')
+    expect(node(container, 'b').getAttribute('aria-posinset')).toBe('2')
+    expect(node(container, 'a1').getAttribute('aria-level')).toBe('3')
+    expect(node(container, 'a1').getAttribute('aria-setsize')).toBe('6')
+    pressKey(node(container, '__agg__a'), ' ')
+    expect(node(container, 'a1').getAttribute('aria-setsize')).toBe('8')
+    tree.toggle('a')
+    expect(container.querySelectorAll('[aria-level="3"]')).toHaveLength(0)
+    tree.destroy()
   })
 
   it('aria-expanded 随折叠切换刷新', () => {

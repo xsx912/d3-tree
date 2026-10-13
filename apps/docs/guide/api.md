@@ -23,10 +23,10 @@ function createBidirectionalTree(container: HTMLElement, options: TreeOptions): 
 | `linkColor` | `string \| (link) => string` / `'#C0C4CC'` | 连线颜色，回调见 [LinkRenderContext](#linkrendercontext) |
 | `linkWidth` | `number` / `1` | 连线宽度（px） |
 | `linkPathGenerator` | `(link) => string` | 完全自定义连线 path d，优先于 linkStyle |
-| `colorByGroup` | `boolean` / `false` | 按 group 调色板着色（白字） |
+| `colorByGroup` | `boolean` / `false` | 按 group 调色板着色；十六进制背景自动选择高对比黑/白字 |
 | `nodeColor` | `(node) => string` | 自定义节点填充，优先于分组色 |
 | `nodeSize` | `(data, variant) => { width, height }` | 节点几何完全接管 |
-| `nodeRenderer` | `(ctx) => void` | SVG 自定义节点渲染（导出无损） |
+| `nodeRenderer` | `(ctx) => void \| (() => void)` | SVG 自定义内容重绘；可返回刷新/退出/销毁清理函数（导出无损） |
 | `nodeTemplate` | `(data, variant) => string \| HTMLElement` | HTML 模板渲染进 foreignObject |
 | `tooltip.formatter` | `(node, ctx) => string \| HTMLElement` | 悬浮框内容：HTML 字符串或 DOM 元素（可承载组件宿主）；默认名称 + properties 键值表（自动转义）；ctx 见 [TooltipContext](#tooltipcontext)。悬浮框**锚定节点**（外侧、边缘翻转、随缩放平移跟随），不随光标移动；内容替换或尺寸变化（异步数据、字体/图片加载）自动重算位置；内容**可交互**：移入弹窗不隐藏（可点击按钮/链接），移出节点或弹窗后约 150ms 防抖隐藏 |
 | `tooltip.className` | `string` | 追加到悬浮层的 class（内置外壳保留，覆盖内联样式需 `!important`） |
@@ -48,7 +48,7 @@ function createBidirectionalTree(container: HTMLElement, options: TreeOptions): 
 
 | 方法 | 说明 |
 | --- | --- |
-| `setData(data)` | 整体替换数据并过渡 |
+| `setData(data)` | 整体替换数据并过渡；每次调用使旧请求失效，清搜索和 loading、重置折叠/释放/分组过滤，保留缩放 |
 | `toggle(id)` | 切换折叠态（根不可折叠） |
 | `expandAll()` / `collapseAll()` | 全展开（含释放聚合）/ 收起至一级板块 |
 | `addChild(parentId, node, side?)` | 追加子节点；父为根时可指定分侧；折叠父自动展开 |
@@ -92,7 +92,7 @@ createBidirectionalTree(el, {
 
 ## NodeRenderContext
 
-`nodeRenderer` 收到的上下文（`group` 已定位在节点中心，向其 append 任意 SVG 内容）：
+`nodeRenderer` 收到的上下文（`group` 是节点中心的独立内容子组，向其 append 任意 SVG 内容）：
 
 ```ts
 interface NodeRenderContext {
@@ -132,8 +132,7 @@ btn.setAttribute('data-d3t-toggle', '')
 ctx.group.appendChild(btn)
 ```
 
-注意：自定义节点内容只在节点进入时渲染一次，折叠态变化不会重跑模板；
-内置 +/− 徽标始终由图表自动绘制并随状态刷新，需要展示状态时优先使用徽标。
+自定义节点内容在每次数据/布局重绘时刷新；回调 group 只拥有内容子组。内置 +/− 徽标始终由图表管理，不会因内容刷新被删除。管理框架内容时可由 nodeRenderer 返回卸载清理函数。
 
 ## TooltipContext
 
@@ -173,3 +172,13 @@ interface LinkEndpoint {
 ## 渲染类名（CSS 定制）
 
 `d3t-node--root|node|aggregate`、`d3t-side--left|right|center`、`d3t-group--<group>`、`d3t-label`、`d3t-link`、`d3t-badge`、`d3t-hit`、`d3t-hit-ancestor`、`d3t-dimmed`、`d3t-loading`、`d3t-tooltip`（悬浮层基类）。SVG 内联属性优先级低于 CSS，可直接以规则覆盖颜色/线型。
+
+分组类名保留 `[a-zA-Z0-9_-]`，其他连续字符变为 `-`；发生替换时追加原字符串的 base36 哈希。例如 `产业` 对应 `d3t-group----3w9nq`，实际值可从节点 DOM 查看。
+
+## 基础无障碍与销毁
+
+节点由 `role="tree"` 拥有，平铺结构显式提供 `aria-level`、`aria-posinset`、`aria-setsize`；聚合操作也为 treeitem，支持 Enter/Space 激活。此为基础支持，不承诺完整树键盘导航或屏幕阅读器符合性。加载脉冲遵循 `prefers-reduced-motion`，默认调色板自动选择高对比文字。
+
+destroy 幂等，恢复由库改变的容器 position（保留调用端后续改动）。销毁后命令无副作用：search 返回 0，增删返回 false，exportImage 拒绝并报告已销毁；已开始的 PNG 导出可完成转换与 URL 清理，但不再触发下载。
+
+数据输入须为无环树且真实节点 ID 全局唯一。formatter/nodeTemplate 的 HTML 字符串由调用端负责转义；默认悬浮框内容已转义。

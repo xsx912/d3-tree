@@ -1,7 +1,14 @@
 import { select } from 'd3-selection'
 import { zoom, ZoomTransform, zoomTransform } from 'd3-zoom'
 import 'd3-transition' // 副作用：为 selection 注册 .transition()
-import { animationAnchor, computeLayout, degenerateLinkPath, linkPath } from './layout'
+import {
+  aggregateKey,
+  animationAnchor,
+  computeLayout,
+  degenerateLinkPath,
+  linkPath,
+  nodeKey,
+} from './layout'
 import type { LayoutLink, LayoutNode, LayoutResult } from './layout'
 import { createCanvasMeasurer } from './measure'
 import { theme } from './theme'
@@ -39,6 +46,9 @@ function buildSvgCss(t: Theme): string {
 .d3t-svg .d3t-node:focus-visible rect,
 .d3t-svg .d3t-node:focus-visible foreignObject { stroke: ${t.hitStroke}; stroke-width: 2; }
 @keyframes d3t-blink { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) {
+  .d3t-svg .d3t-loading rect { animation: none; }
+}
 `
 }
 
@@ -64,7 +74,7 @@ function warnDuplicateIds(root: TreeNodeData): void {
   walk(root)
   if (dupes.size) {
     console.warn(
-      `[d3-tree] 数据中存在重复节点 id：${[...dupes].map(id => `"${id}"`).join('、')}；同 id 节点只会渲染一个`,
+      `[d3-tree] 数据中存在重复节点 id：${[...dupes].map((id) => `"${id}"`).join('、')}；同 id 节点只会渲染一个`,
     )
   }
 }
@@ -164,9 +174,14 @@ export function createBidirectionalTree(
   /** 自定义渲染模式：用户完全接管节点内容时，core 不再刷新默认填充/文字色 */
   const customNodeRender: NodeRenderer | undefined =
     options.nodeRenderer ??
-    (options.nodeTemplate
-      ? createTemplateRenderer(options.nodeTemplate)
-      : undefined)
+    (options.nodeTemplate ? createTemplateRenderer(options.nodeTemplate) : undefined)
+  const contentCleanups = new Map<SVGGElement, () => void>()
+  const contentGroups = new WeakMap<SVGGElement, SVGGElement>()
+  function disposeContent(element: SVGGElement): void {
+    const cleanup = contentCleanups.get(element)
+    contentCleanups.delete(element)
+    cleanup?.()
+  }
 
   const svg = select(container)
     .append('svg')
@@ -180,19 +195,25 @@ export function createBidirectionalTree(
   const gZoom = svg.append('g').attr('class', 'd3t-zoom')
   const gChart = gZoom.append('g').attr('class', 'd3t-chart')
   const gLink = gChart.append('g').attr('class', 'd3t-links').attr('fill', 'none')
-  const gNode = gChart.append('g').attr('class', 'd3t-nodes')
+  const gNode = gChart.append('g').attr('class', 'd3t-nodes').attr('role', 'tree')
 
   const zoomBehavior = zoom<SVGSVGElement, unknown>()
     .scaleExtent([0.1, 4])
-    .extent(() => [[0, 0], [container.clientWidth || 800, container.clientHeight || 600]])
-    .on('zoom', event => {
+    .extent(() => [
+      [0, 0],
+      [container.clientWidth || 800, container.clientHeight || 600],
+    ])
+    .on('zoom', (event) => {
       gZoom.attr('transform', event.transform.toString())
       positionTooltip() // 悬浮层锚定节点：缩放/平移时跟随重算
     })
   svg.call(zoomBehavior).on('dblclick.zoom', null) // 双击留给业务，不抢缩放
 
   // ---- tooltip（容器内绝对定位 div，框架无关）----
-  if (getComputedStyle(container).position === 'static') {
+  const originalPosition = container.style.getPropertyValue('position')
+  const originalPositionPriority = container.style.getPropertyPriority('position')
+  const changedPosition = getComputedStyle(container).position === 'static'
+  if (changedPosition) {
     container.style.position = 'relative'
   }
   /** 悬浮框显隐节奏：移入显示延时/移出防抖延时与淡入淡出时长（"减少动态效果"偏好下未显式配置时无过渡） */
@@ -233,7 +254,10 @@ export function createBidirectionalTree(
 
   function defaultTooltipHtml(node: TreeNodeData): string {
     const rows = Object.entries(node.properties ?? {})
-      .map(([k, v]) => `<tr><td style="padding-right:12px;color:#909399">${escapeHtml(k)}</td><td>${escapeHtml(String(v))}</td></tr>`)
+      .map(
+        ([k, v]) =>
+          `<tr><td style="padding-right:12px;color:#909399">${escapeHtml(k)}</td><td>${escapeHtml(String(v))}</td></tr>`,
+      )
       .join('')
     const title = `<div style="font-weight:600;margin-bottom:4px">${escapeHtml(node.name)}</div>`
     return rows ? `${title}<table>${rows}</table>` : title
@@ -305,7 +329,7 @@ export function createBidirectionalTree(
     return {
       depth: d.depth,
       side: d.side,
-      collapsed: collapsedIds.has(d.key),
+      collapsed: collapsedIds.has(d.data.id),
       element,
       aggregate: d.variant === 'aggregate',
     }
@@ -401,7 +425,11 @@ export function createBidirectionalTree(
   // · ResizeObserver：纯尺寸变化（字体/图片加载撑高，DOM 不变）时兜底
   // 隐藏期 positionTooltip 有守卫直接返回，两者幂等（不监听 attributes，避免写 left/top 自触发）
   const tooltipMutationObserver = new MutationObserver(() => positionTooltip())
-  tooltipMutationObserver.observe(tooltipEl, { childList: true, subtree: true, characterData: true })
+  tooltipMutationObserver.observe(tooltipEl, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+  })
   let tooltipResizeObserver: ResizeObserver | null = null
   if (typeof ResizeObserver === 'function') {
     tooltipResizeObserver = new ResizeObserver(() => positionTooltip())
@@ -423,16 +451,14 @@ export function createBidirectionalTree(
   }
   let searchState: SearchState | null = null
 
-  function collectHits(
-    keyword: string,
-  ): { hits: Set<string>; paths: TreeNodeData[][] } {
+  function collectHits(keyword: string): { hits: Set<string>; paths: TreeNodeData[][] } {
     const kw = keyword.toLowerCase()
     const hits = new Set<string>()
     const paths: TreeNodeData[][] = []
     const walk = (node: TreeNodeData, path: TreeNodeData[]): void => {
       const hit =
         node.name.toLowerCase().includes(kw) ||
-        Object.values(node.properties ?? {}).some(v => String(v).toLowerCase().includes(kw))
+        Object.values(node.properties ?? {}).some((v) => String(v).toLowerCase().includes(kw))
       if (hit) {
         hits.add(node.id)
         paths.push([...path, node])
@@ -447,22 +473,19 @@ export function createBidirectionalTree(
     const inChain = (id: string) => state.hits.has(id) || state.ancestors.has(id)
     gNode
       .selectAll<SVGGElement, LayoutNode>('g.d3t-node')
-      .classed('d3t-hit', d => state.hits.has(d.data.id))
+      .classed('d3t-hit', (d) => state.hits.has(d.data.id))
       .classed(
         'd3t-hit-ancestor',
-        d => state.ancestors.has(d.data.id) && !state.hits.has(d.data.id),
+        (d) => state.ancestors.has(d.data.id) && !state.hits.has(d.data.id),
       )
-      .classed(
-        'd3t-dimmed',
-        d => d.variant !== 'root' && !inChain(d.data.id),
-      )
+      .classed('d3t-dimmed', (d) => d.variant !== 'root' && !inChain(d.data.id))
     gLink
       .selectAll<SVGPathElement, LayoutLink>('path.d3t-link')
-      .classed('d3t-dimmed', d => !inChain(d.source.data.id) || !inChain(d.target.data.id))
+      .classed('d3t-dimmed', (d) => !inChain(d.source.data.id) || !inChain(d.target.data.id))
   }
 
   function focusNode(nodeId: string): void {
-    const target = lastLayout?.nodes.find(n => n.data.id === nodeId)
+    const target = lastLayout?.nodes.find((n) => n.data.id === nodeId)
     if (!target) return
     const { width, height } = size()
     const current = zoomTransform(svg.node()!)
@@ -496,7 +519,7 @@ export function createBidirectionalTree(
         ancestors.add(parent.id)
         collapsedIds.delete(parent.id)
         if (visibleChildrenLimit > 0 && parent.children?.length) {
-          const idx = parent.children.findIndex(c => c.id === child.id)
+          const idx = parent.children.findIndex((c) => c.id === child.id)
           if (idx >= visibleChildrenLimit) {
             const need = idx + 1 - visibleChildrenLimit
             revealed.set(parent.id, Math.max(revealed.get(parent.id) ?? 0, need))
@@ -545,7 +568,7 @@ export function createBidirectionalTree(
       .attr('cursor', null)
       .style('background', t.background)
     c.select('g.d3t-zoom').attr('transform', null) // 忽略当前缩放，导出完整内容
-    clone.querySelectorAll('[cursor]').forEach(el => el.removeAttribute('cursor'))
+    clone.querySelectorAll('[cursor]').forEach((el) => el.removeAttribute('cursor'))
     const style = document.createElementNS('http://www.w3.org/2000/svg', 'style')
     style.textContent = buildSvgCss(t)
     clone.insertBefore(style, clone.firstChild)
@@ -561,12 +584,12 @@ export function createBidirectionalTree(
     a.remove()
   }
 
-  async function svgToPngDataUrl(
+  async function svgToPngBlob(
     svgString: string,
     width: number,
     height: number,
     scale: number,
-  ): Promise<string> {
+  ): Promise<Blob> {
     const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     try {
@@ -584,13 +607,29 @@ export function createBidirectionalTree(
       ctx.fillStyle = t.background
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      return canvas.toDataURL('image/png')
+      return await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => (blob ? resolve(blob) : reject(new Error('PNG 编码失败'))),
+          'image/png',
+        )
+      })
     } finally {
       URL.revokeObjectURL(url)
     }
   }
 
+  function downloadBlob(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob)
+    try {
+      triggerDownload(url, filename)
+    } finally {
+      // 延迟回收以免中断浏览器下载；即使触发下载抛错也保证回收。
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    }
+  }
+
   async function exportImageImpl(opts: ExportImageOptions): Promise<void> {
+    if (destroyed) throw new Error('图谱已销毁，无法导出')
     const format = opts.format ?? 'png'
     const scale = opts.scale ?? 2
     const filename = opts.filename ?? 'bidirectional-tree'
@@ -598,19 +637,17 @@ export function createBidirectionalTree(
     const svgString = new XMLSerializer().serializeToString(element)
     if (format === 'svg') {
       const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      triggerDownload(url, `${filename}.svg`)
-      // 延迟回收 blob URL：立即 revoke 在个别浏览器会导致下载中断
-      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      downloadBlob(blob, `${filename}.svg`)
       return
     }
-    const dataUrl = await svgToPngDataUrl(svgString, width, height, scale)
-    triggerDownload(dataUrl, `${filename}.png`)
+    const blob = await svgToPngBlob(svgString, width, height, scale)
+    if (!destroyed) downloadBlob(blob, `${filename}.png`)
   }
 
   let currentData: TreeNodeData = options.data
   /** destroy 后置位：在途的 loadChildren 完成时不再触碰已销毁的 DOM */
   let destroyed = false
+  let dataGeneration = 0
   let collapsedIds = seedCollapsed(currentData)
   /** 聚合释放状态：父 id → 已额外释放的子节点数（超出 visibleChildrenLimit 部分） */
   let revealed = new Map<string, number>()
@@ -648,7 +685,7 @@ export function createBidirectionalTree(
     return t.nodeFill
   }
 
-  /** 分组着色或自定义着色时使用白字保证对比度 */
+  /** 分组着色或自定义着色时按背景选择高对比文字 */
   function isColored(d: LayoutNode): boolean {
     if (d.variant === 'root') return false
     if (options.nodeColor?.(d.data)) return true
@@ -658,7 +695,17 @@ export function createBidirectionalTree(
   function textColor(d: LayoutNode): string {
     if (d.variant === 'root') return t.rootText
     if (d.variant === 'aggregate') return t.aggregateText
-    return isColored(d) ? '#FFFFFF' : t.nodeText
+    if (!isColored(d)) return t.nodeText
+    const fill = rectFill(d)
+    const hex = /^#([\da-f]{3}|[\da-f]{6})$/i.exec(fill)?.[1]
+    if (!hex) return '#FFFFFF' // 非十六进制的调用端颜色保持既有行为
+    const full = hex.length === 3 ? [...hex].map((c) => c + c).join('') : hex
+    const linear = [0, 2, 4].map((offset) => {
+      const channel = parseInt(full.slice(offset, offset + 2), 16) / 255
+      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+    })
+    const luminance = linear[0]! * 0.2126 + linear[1]! * 0.7152 + linear[2]! * 0.0722
+    return (luminance + 0.05) / 0.05 >= 1.05 / (luminance + 0.05) ? '#000000' : '#FFFFFF'
   }
 
   /** 中文等非类名字符替换为 '-'；替换后与原名不一致时追加短哈希，避免 "a b" 与 "a-b" 折叠成同一类名 */
@@ -673,7 +720,8 @@ export function createBidirectionalTree(
   }
 
   function nodeClass(d: LayoutNode): string {
-    const group = d.data.group && d.variant !== 'root' ? ` d3t-group--${sanitizeGroupClass(d.data.group)}` : ''
+    const group =
+      d.data.group && d.variant !== 'root' ? ` d3t-group--${sanitizeGroupClass(d.data.group)}` : ''
     return `d3t-node d3t-node--${d.variant} d3t-side--${d.side}${group}`
   }
 
@@ -723,7 +771,7 @@ export function createBidirectionalTree(
   /** 官方 collapsible-tree 模式：翻转折叠态后以被点击节点为动画源重绘 */
   function toggleById(id: string): void {
     if (id === currentData.id) return
-    if (loadingKeys.has(id)) return // 懒加载进行中：忽略重复触发
+    if (destroyed || loadingKeys.has(nodeKey(id))) return // 懒加载进行中：忽略重复触发
     const dataNode = findDataById(currentData, id)
     if (!dataNode) return
     // 首次展开"存在未加载下一级"的节点：经 loadChildren 异步拉取（有下一级则走本地切换）
@@ -742,11 +790,13 @@ export function createBidirectionalTree(
   function expandLazy(node: TreeNodeData): void {
     const loader = options.loadChildren
     if (!loader) return
-    setLoading(node.id, true)
+    const generation = dataGeneration
+    const key = nodeKey(node.id)
+    setLoading(key, true)
     loader(node)
-      .then(fetched => {
-        if (destroyed) return
-        const existing = new Set((node.children ?? []).map(c => c.id))
+      .then((fetched) => {
+        if (destroyed || generation !== dataGeneration) return
+        const existing = new Set((node.children ?? []).map((c) => c.id))
         node.children = [...(node.children ?? [])]
         for (const child of fetched) {
           if (!existing.has(child.id)) node.children!.push(child)
@@ -757,12 +807,13 @@ export function createBidirectionalTree(
           collapsedIds.delete(node.id)
           options.onNodeToggle?.(node, false)
         }
-        setLoading(node.id, false)
+        if (destroyed || generation !== dataGeneration) return
+        setLoading(key, false)
         render(node.id)
       })
       .catch((error: unknown) => {
-        if (destroyed) return
-        setLoading(node.id, false)
+        if (destroyed || generation !== dataGeneration) return
+        setLoading(key, false)
         options.onLoadError?.(error, node)
       })
   }
@@ -773,7 +824,7 @@ export function createBidirectionalTree(
   function setLoading(key: string, loading: boolean): void {
     gNode
       .selectAll<SVGGElement, LayoutNode>('g.d3t-node')
-      .filter(n => n.key === key)
+      .filter((n) => n.key === key)
       .classed('d3t-loading', loading)
     if (loading) loadingKeys.add(key)
     else loadingKeys.delete(key)
@@ -785,27 +836,25 @@ export function createBidirectionalTree(
     if (!parent) return
     const loader = options.loadChildren
     if (loader) {
-      const aggKey = `__agg__${parentId}`
+      const generation = dataGeneration
+      const aggKey = aggregateKey(parentId)
       if (loadingKeys.has(aggKey)) return // 加载中：忽略重复触发
       setLoading(aggKey, true)
       loader(parent)
-        .then(fetched => {
-          if (destroyed) return
-          const existing = new Set((parent.children ?? []).map(c => c.id))
+        .then((fetched) => {
+          if (destroyed || generation !== dataGeneration) return
+          const existing = new Set((parent.children ?? []).map((c) => c.id))
           parent.children = [...(parent.children ?? [])]
           for (const child of fetched) {
             if (!existing.has(child.id)) parent.children!.push(child)
           }
           // 回调返回的子节点并入数据后全部可见
-          revealed.set(
-            parentId,
-            Math.max(0, parent.children!.length - visibleChildrenLimit),
-          )
+          revealed.set(parentId, Math.max(0, parent.children!.length - visibleChildrenLimit))
           setLoading(aggKey, false)
           render(parentId)
         })
         .catch((error: unknown) => {
-          if (destroyed) return
+          if (destroyed || generation !== dataGeneration) return
           setLoading(aggKey, false)
           options.onLoadError?.(error, parent)
         })
@@ -864,32 +913,47 @@ export function createBidirectionalTree(
   }
 
   function render(sourceKey?: string): void {
+    if (destroyed) return
     const layout = currentLayout()
+    gNode.attr('aria-label', currentData.name)
+    const siblings = new Map<string | null, LayoutNode[]>()
+    const siblingKey = (item: LayoutNode) =>
+      item.variant === 'root' ? null : nodeKey(item.parentId)
+    for (const item of layout.nodes) {
+      const list = siblings.get(siblingKey(item)) ?? []
+      list.push(item)
+      siblings.set(siblingKey(item), list)
+    }
+    const siblingPosition = new Map<LayoutNode, { position: number; total: number }>()
+    for (const list of siblings.values()) {
+      list.forEach((item, index) =>
+        siblingPosition.set(item, { position: index + 1, total: list.length }),
+      )
+    }
     const { width, height } = size()
     gChart.attr('transform', `translate(${width / 2},${height / 2})`)
 
     const animate = duration > 0 && sourceKey !== undefined
-    const sourceOld = sourceKey !== undefined ? lastNodes.get(sourceKey) : undefined
+    const sourceOld =
+      sourceKey !== undefined
+        ? (lastNodes.get(nodeKey(sourceKey)) ?? lastNodes.get(nodeKey(sourceKey, 'root')))
+        : undefined
     const sourceNew =
-      sourceKey !== undefined ? layout.nodes.find(n => n.key === sourceKey) : undefined
+      sourceKey !== undefined
+        ? layout.nodes.find((n) => n.data.id === sourceKey && n.variant !== 'aggregate')
+        : undefined
     // 动画锚点取父节点「朝子节点一侧」的边缘中点（连线发出点）；
     // 未知源（首帧后仍无记录的兜底）沿用根中心 (0,0)
-    const start: Position = sourceOld
-      ? animationAnchor(sourceOld, orientation)
-      : { x: 0, y: 0 }
+    const start: Position = sourceOld ? animationAnchor(sourceOld, orientation) : { x: 0, y: 0 }
     const end: Position = sourceNew ? animationAnchor(sourceNew, orientation) : start
 
     // ---- 连线 ----
-    const link = gLink
-      .selectAll<SVGPathElement, LayoutLink>('path')
-      .data(layout.links, d => d.id)
+    const link = gLink.selectAll<SVGPathElement, LayoutLink>('path').data(layout.links, (d) => d.id)
 
     // 自定义路径优先于 linkStyle；因其命令结构未知，跳过 enter/exit 形变插值直接呈现
     const customLinkPath = options.linkPathGenerator
     const dOf = (l: LayoutLink): string =>
-      customLinkPath
-        ? customLinkPath(toLinkCtx(l))
-        : linkPath(l, columnGap, linkStyle, orientation)
+      customLinkPath ? customLinkPath(toLinkCtx(l)) : linkPath(l, columnGap, linkStyle, orientation)
     const interpolating = animate && !customLinkPath
     // 淡入淡出只随动画路径生效；透明度与路径形变正交，自定义连线同样适用
     const fading = animate && fade < 1
@@ -914,13 +978,12 @@ export function createBidirectionalTree(
       .attr('stroke', linkColorOf)
       .attr('stroke-width', linkWidthOf)
       .attr('opacity', fading ? fade : null)
-      .attr('d', d => (interpolating ? degenerateLinkPath(start, linkStyle, orientation) : dOf(d)))
+      .attr('d', (d) =>
+        interpolating ? degenerateLinkPath(start, linkStyle, orientation) : dOf(d),
+      )
     const linkMerged = linkEnter.merge(link)
     if (interpolating) {
-      const linkT = linkMerged
-        .transition()
-        .duration(duration)
-        .attr('d', dOf)
+      const linkT = linkMerged.transition().duration(duration).attr('d', dOf)
       if (fading) {
         linkMerged.attr('opacity', normalizeOpacity)
         linkT.attr('opacity', 1)
@@ -939,7 +1002,10 @@ export function createBidirectionalTree(
     // 选择器限定 g.d3t-node：避免把徽标分组 g.d3t-badge（携带同 key 的数据）卷进 join 而被误判为重复 key 移除
     const node = gNode
       .selectAll<SVGGElement, LayoutNode>('g.d3t-node')
-      .data(layout.nodes, d => d.key)
+      .data(layout.nodes, (d) => d.key)
+    node.exit<LayoutNode>().each(function () {
+      disposeContent(this)
+    })
 
     if (animate) {
       const exitNodes = node.exit<LayoutNode>()
@@ -958,12 +1024,12 @@ export function createBidirectionalTree(
       .enter()
       .append('g')
       .attr('class', nodeClass)
-      .attr('data-id', d => d.data.id)
+      .attr('data-id', (d) => d.data.id)
       .attr('transform', () => `translate(${start.x},${start.y})`)
       .attr('opacity', fading ? fade : null)
-      .attr('cursor', d => (d.variant === 'root' ? 'default' : 'pointer'))
-      .attr('role', d => (d.variant === 'aggregate' ? 'button' : 'treeitem'))
-      .attr('aria-label', d => d.name)
+      .attr('cursor', (d) => (d.variant === 'root' ? 'default' : 'pointer'))
+      .attr('role', 'treeitem')
+      .attr('aria-label', (d) => d.name)
       .attr('tabindex', 0)
       .on('click', (event, d) => activateNode(event, d))
       .on('keydown', (event, d) => {
@@ -1001,45 +1067,33 @@ export function createBidirectionalTree(
         }
       })
 
-    if (customNodeRender) {
-      nodeEnter.each(function (d) {
-        customNodeRender!({
-          group: this,
-          data: d.data,
-          variant: d.variant,
-          side: d.side,
-          depth: d.depth,
-          width: d.width,
-          height: d.height,
-        })
-      })
-    } else {
+    if (!customNodeRender) {
       nodeEnter
         .append('rect')
-        .attr('x', d => -d.width / 2)
-        .attr('y', d => -d.height / 2)
-        .attr('width', d => d.width)
-        .attr('height', d => d.height)
+        .attr('x', (d) => -d.width / 2)
+        .attr('y', (d) => -d.height / 2)
+        .attr('width', (d) => d.width)
+        .attr('height', (d) => d.height)
         .attr('rx', t.radius)
         .attr('ry', t.radius)
         .attr('fill', rectFill)
-        .attr('stroke', d => (d.variant === 'root' ? 'none' : t.nodeStroke))
+        .attr('stroke', (d) => (d.variant === 'root' ? 'none' : t.nodeStroke))
       nodeEnter
         .append('text')
         .attr('class', 'd3t-label')
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'central')
         .attr('font-family', t.font)
-        .attr('font-size', d => (d.variant === 'root' ? t.rootFontSize : t.nodeFontSize))
-        .attr('font-weight', d => (d.variant === 'root' ? 'bold' : 'normal'))
+        .attr('font-size', (d) => (d.variant === 'root' ? t.rootFontSize : t.nodeFontSize))
+        .attr('font-weight', (d) => (d.variant === 'root' ? 'bold' : 'normal'))
         .attr('fill', textColor)
-        .text(d => d.name)
+        .text((d) => d.name)
     }
 
     // +/− 徽标（仅普通节点；根节点与聚合虚拟节点不展示）
     // 徽标操作与节点本体键盘激活重复，标记 aria-hidden 避免屏幕阅读器/Tab 序列重复停留
     const badge = nodeEnter
-      .filter(d => d.variant === 'node')
+      .filter((d) => d.variant === 'node')
       .append('g')
       .attr('class', 'd3t-badge')
       .attr('cursor', 'pointer')
@@ -1070,27 +1124,60 @@ export function createBidirectionalTree(
     badge.append('title')
 
     const nodeMerged = nodeEnter.merge(node)
+    nodeMerged
+      .attr('class', nodeClass)
+      .attr('data-id', (d) => d.data.id)
+      .attr('aria-label', (d) => d.name)
+      .attr('role', 'treeitem')
+      .attr('aria-level', (d) => d.depth + 1)
+      .attr('aria-posinset', (d) => siblingPosition.get(d)!.position)
+      .attr('aria-setsize', (d) => siblingPosition.get(d)!.total)
+      .attr('cursor', (d) => (d.variant === 'root' ? 'default' : 'pointer'))
+      .classed('d3t-loading', (d) => loadingKeys.has(d.key))
+    if (customNodeRender) {
+      nodeMerged.each(function (d) {
+        disposeContent(this)
+        // 回调只拥有此内容子组；刷新不会删除徽标或节点事件。
+        contentGroups.get(this)?.remove()
+        const content = document.createElementNS(SVG_NS, 'g')
+        content.setAttribute('class', 'd3t-content')
+        this.insertBefore(content, this.firstChild)
+        contentGroups.set(this, content)
+        const cleanup = customNodeRender!({
+          group: content,
+          data: d.data,
+          variant: d.variant,
+          side: d.side,
+          depth: d.depth,
+          width: d.width,
+          height: d.height,
+        })
+        if (typeof cleanup === 'function') contentCleanups.set(this, cleanup)
+      })
+    }
     if (animate) {
       if (fading) nodeMerged.attr('opacity', normalizeOpacity)
       const nodeT = nodeMerged
         .transition()
         .duration(duration)
-        .attr('transform', d => `translate(${d.x},${d.y})`)
+        .attr('transform', (d) => `translate(${d.x},${d.y})`)
       if (fading) nodeT.attr('opacity', 1)
     } else {
-      nodeMerged.attr('transform', d => `translate(${d.x},${d.y})`)
+      nodeMerged.attr('transform', (d) => `translate(${d.x},${d.y})`)
     }
 
     // 徽标状态刷新：可见性、+/− 符号、悬停提示（后代数）；节点展开态同步到 aria-expanded
-    nodeMerged.attr('aria-expanded', d => {
+    nodeMerged.attr('aria-expanded', (d) => {
       const unloaded = d.data.hasChildren === true && !d.data.children?.length
       if (unloaded) return 'false'
-      return d.data.children?.length ? String(!collapsedIds.has(d.key)) : null
+      return d.data.children?.length ? String(!collapsedIds.has(d.data.id)) : null
     })
     nodeMerged.select<SVGGElement>('g.d3t-badge').each(function (d) {
       const g = select(this)
       const unloaded = d.data.hasChildren === true && !d.data.children?.length
-      const expanded = !!d.data.children?.length && !collapsedIds.has(d.key)
+      const expanded = !!d.data.children?.length && !collapsedIds.has(d.data.id)
+      g.select('circle.d3t-badge-circle').attr('cx', badgeCenterX(d)).attr('cy', badgeCenterY(d))
+      g.select('text.d3t-badge-symbol').attr('x', badgeCenterX(d)).attr('y', badgeCenterY(d))
       g.style('display', d.data.children?.length || unloaded ? '' : 'none')
       g.select<SVGTextElement>('text.d3t-badge-symbol').text(expanded ? '−' : '+')
       const n = countDescendants(d.data)
@@ -1107,15 +1194,15 @@ export function createBidirectionalTree(
     if (!customNodeRender) {
       nodeMerged
         .select<SVGRectElement>('rect')
-        .attr('x', d => -d.width / 2)
-        .attr('y', d => -d.height / 2)
-        .attr('width', d => d.width)
-        .attr('height', d => d.height)
+        .attr('x', (d) => -d.width / 2)
+        .attr('y', (d) => -d.height / 2)
+        .attr('width', (d) => d.width)
+        .attr('height', (d) => d.height)
         .attr('fill', rectFill)
       nodeMerged
         .select<SVGTextElement>('text.d3t-label')
         .attr('fill', textColor)
-        .text(d => d.name)
+        .text((d) => d.name)
     }
 
     // 自接管模式：重渲染后节点位置/存亡变化，对齐内置"锚点失效即隐藏"语义通知移出
@@ -1155,7 +1242,11 @@ export function createBidirectionalTree(
 
   return {
     setData(data) {
+      if (destroyed) return
       warnDuplicateIds(data)
+      dataGeneration++
+      loadingKeys.clear()
+      clearSearchImpl()
       const sourceKey = currentData.id
       currentData = data
       collapsedIds = seedCollapsed(data)
@@ -1170,48 +1261,56 @@ export function createBidirectionalTree(
       toggleById(id)
     },
     expandAll() {
+      if (destroyed) return
       collapsedIds.clear()
       if (visibleChildrenLimit > 0) {
-        walkAll(currentData, n => {
+        walkAll(currentData, (n) => {
           if (n.children?.length) revealed.set(n.id, n.children.length)
         })
       }
       render(currentData.id)
     },
     collapseAll() {
+      if (destroyed) return
       collapsedIds.clear()
-      walkAll(currentData, n => {
+      walkAll(currentData, (n) => {
         if (n.children?.length && n.id !== currentData.id) collapsedIds.add(n.id)
       })
       revealed.clear()
       render(currentData.id)
     },
     addChild(parentId, node, side) {
+      if (destroyed) return false
       const parent = findDataById(currentData, parentId)
       if (!parent) return false
-      const child =
-        side && parentId === currentData.id ? { ...node, side } : node
+      const child = side && parentId === currentData.id ? { ...node, side } : node
       parent.children = [...(parent.children ?? []), child]
       collapsedIds.delete(parentId)
       render(parentId)
       return true
     },
     removeChild(id) {
+      if (destroyed) return false
       if (id === currentData.id) return false
       const parent = findParentOf(currentData, id)
-      if (!parent?.children?.some(c => c.id === id)) return false
-      const removed = parent.children.find(c => c.id === id)!
-      parent.children = parent.children.filter(c => c.id !== id)
+      if (!parent?.children?.some((c) => c.id === id)) return false
+      const removed = parent.children.find((c) => c.id === id)!
+      parent.children = parent.children.filter((c) => c.id !== id)
       pruneState(removed)
       render(parent.id)
       return true
     },
     zoomToFit() {
+      if (destroyed) return
       const layout = currentLayout()
       const { minX, maxX, minY, maxY } = layout.bounds
       const { width, height } = size()
       const pad = 40
-      const k = Math.min((width - pad) / Math.max(maxX - minX, 1), (height - pad) / Math.max(maxY - minY, 1), 1)
+      const k = Math.min(
+        (width - pad) / Math.max(maxX - minX, 1),
+        (height - pad) / Math.max(maxY - minY, 1),
+        1,
+      )
       const cx = (minX + maxX) / 2
       const cy = (minY + maxY) / 2
       // 内容层 gChart 自带居中平移 (width/2, height/2)，zoom 变换须先抵消该偏移再居中：
@@ -1228,20 +1327,24 @@ export function createBidirectionalTree(
       }
     },
     setVisibleGroups(groups) {
+      if (destroyed) return
       visibleGroups = groups ? new Set(groups) : null
       render(currentData.id)
     },
     search(keyword) {
-      return searchImpl(keyword)
+      return destroyed ? 0 : searchImpl(keyword)
     },
     clearSearch() {
+      if (destroyed) return
       clearSearchImpl()
     },
     exportImage(options) {
       return exportImageImpl(options ?? {})
     },
     destroy() {
+      if (destroyed) return
       destroyed = true
+      for (const element of contentCleanups.keys()) disposeContent(element)
       resizeObserver?.disconnect()
       tooltipMutationObserver.disconnect()
       tooltipResizeObserver?.disconnect()
@@ -1252,6 +1355,15 @@ export function createBidirectionalTree(
       cancelTooltipHide()
       hoverLastNode = null // destroy 不发 end（对齐 onTooltipHide 先例，组件卸载自管清理）
       styleEl.remove()
+      if (
+        changedPosition &&
+        container.style.position === 'relative' &&
+        !container.style.getPropertyPriority('position')
+      ) {
+        if (originalPosition)
+          container.style.setProperty('position', originalPosition, originalPositionPriority)
+        else container.style.removeProperty('position')
+      }
     },
   }
 }

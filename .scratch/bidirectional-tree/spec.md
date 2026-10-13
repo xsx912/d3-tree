@@ -54,7 +54,7 @@ Status: ready-for-agent
 
 ## Implementation Decisions
 
-- **工程**：pnpm monorepo；`packages/core`、`packages/vue`（peerDependencies: vue ^3）、`packages/react`（peerDependencies: react ^17|^18|^19）；`apps/demo` 为 Vite 多页应用（三 HTML 入口）。包构建用 tsup（ESM + d.ts），测试 vitest，格式化 prettier。
+- **工程**：pnpm monorepo；`packages/core`、`packages/vue`（peerDependencies: vue ^3）、`packages/react`（peerDependencies: react ^18|^19）；`apps/demo` 为 Vite 多页应用（三 HTML 入口）。包构建用 tsup（ESM + d.ts），测试 vitest，格式化 prettier。
 - **核心依赖**：core 直接依赖 d3 v7（hierarchy/selection/transition/zoom 等，打包摇树交给消费方）。
 - **数据模型**：节点为 `{ id, name, group?, side?: 'left' | 'right', collapsed?, properties?, children? }`；根的直接子节点按 `side` 分侧，缺省按数量均分。
 - **双向布局**：每侧各建 hierarchy 并以 `d3.tree().nodeSize([rowHeight, 1])` 计算纵向次序坐标；横向按深度分列，列起点 = 前列起点 + 该侧该深度最大节点宽度 + columnGap；左侧横向坐标取负镜像；两侧根对齐于 (0,0)。文本宽度用离屏 canvas measureText 度量（根节点字体更大单独度量），度量函数可从 options 注入以保证测试确定性。
@@ -63,7 +63,7 @@ Status: ready-for-agent
 - **连线**：默认正交折线 generator；可选 `linkStyle: 'diagonal'`（d3.linkHorizontal）。
 - **徽标**：节点外侧 14–16px 圆形 +/− 徽标，独立点击热区；徽标与节点本体点击都触发折叠切换；徽标 title 提示被收起后代数。
 - **缩放**：d3.zoom 绑定 svg 根分组；`zoomToFit()` 计算内容包围盒与视口比例。
-- **tooltip**：容器内绝对定位 div，跟随鼠标，内容由 formatter 回调生成（默认渲染 properties 键值表）。
+- **tooltip**：容器内绝对定位 div，锚定节点并随缩放/平移重定位（ADR-0002），内容由 formatter 回调生成（默认渲染 properties 键值表）。
 - **图例筛选**：`setVisibleGroups(groups)` 隐藏非该组节点（连同其子树），图例 UI 由 demo 承担，core 只提供能力与配色回调。
 - **搜索**：`search(keyword)` 对 name（及 properties 字符串值）做包含匹配，命中集并入全部祖先链，非命中整体降低不透明度，视口平移缩放至首个命中；`clearSearch()` 还原。
 - **导出**：SVG 序列化（克隆节点内联计算样式）下载；PNG 将 SVG 转 blob→Image→canvas（2x scale）→ dataURL 下载。

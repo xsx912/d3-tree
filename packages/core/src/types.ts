@@ -62,7 +62,7 @@ export type NodeSizeFn = (
   variant: NodeVariant,
 ) => { width: number; height: number }
 
-/** 自定义节点渲染上下文：group 已定位在节点中心，向其 append 任意 SVG 内容 */
+/** 自定义节点渲染上下文：group 是节点中心的内容子组，不包含库管理的徽标 */
 export interface NodeRenderContext {
   group: SVGGElement
   data: TreeNodeData
@@ -75,14 +75,18 @@ export interface NodeRenderContext {
 
 /**
  * SVG 自定义渲染器（优先于 nodeTemplate 与默认渲染；导出 PNG/SVG 无损）。
+ * 每次数据/布局重绘重新调用，库先清理旧内容；缩放/平移不重绘内容。
+ * 可返回清理函数，用于卸载内容中的框架组件/监听器；刷新、退出和 destroy 时调用。
  * 内容中标记 data-d3t-toggle 属性的元素点击时切换该节点折叠/展开
  * （同内置徽标语义：阻断冒泡、不触发选中回调、不受 toggleOnNodeClick 约束），
  * 供调用端自行决定自定义节点的哪块区域可折叠展开。
  */
-export type NodeRenderer = (context: NodeRenderContext) => void
+export type NodeRenderer = (context: NodeRenderContext) => void | (() => void)
 
 /**
  * HTML 模板：返回 HTML 字符串或元素，渲染进节点 foreignObject（导出 PNG 需内联样式）。
+ * 每次数据/布局重绘重新调用；字符串按 HTML 解析，转义由调用端负责。
+ * 托管需要卸载的框架组件请用支持清理返回值的 nodeRenderer。
  * 内容中标记 data-d3t-toggle 属性的元素点击时切换该节点折叠/展开
  * （同内置徽标语义：阻断冒泡、不触发选中回调、不受 toggleOnNodeClick 约束），
  * 供调用端自行决定自定义节点的哪块区域可折叠展开。
@@ -246,7 +250,7 @@ export interface ExportImageOptions {
 
 /** createBidirectionalTree 返回的图表实例（命令式 API） */
 export interface TreeInstance {
-  /** 整体替换数据并过渡到新布局 */
+  /** 整体替换数据并过渡；清搜索/旧请求，重置折叠/释放/分组过滤，保留缩放 */
   setData(data: TreeNodeData): void
   /** 切换指定节点的折叠态（根节点不可折叠） */
   toggle(id: string): void
@@ -278,6 +282,6 @@ export interface TreeInstance {
   clearSearch(): void
   /** 导出当前可见图谱为 SVG 或 PNG 文件 */
   exportImage(options?: ExportImageOptions): Promise<void>
-  /** 移除 SVG 与全部监听 */
+  /** 幂等清理并恢复容器样式；此后命令无副作用，增删 false、搜索 0、导出拒绝 */
   destroy(): void
 }

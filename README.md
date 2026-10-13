@@ -19,7 +19,7 @@
 - 缩放平移 + `zoomToFit`；分组着色 + tooltip + 图例筛选；搜索高亮定位（含祖先链）；导出 PNG/SVG；编程式增删节点
 - 主题与文案可配：`theme` 浅合并覆盖任意视觉字段（背景/节点/连线/徽标/调色板），`texts` 国际化内置文案
 - 可访问性基线：节点键盘可操作（Enter/Space）、ARIA role/label/expanded、响应系统"减少动态效果"偏好
-- TypeScript 全量类型，Vitest 覆盖公共 API（105 例），ESLint + changesets + GitHub Actions 全链路工程化
+- TypeScript 全量类型，Vitest 覆盖 core 公共 API 与 Vue/React 组件生命周期，ESLint + changesets + GitHub Actions 全链路工程化
 
 ## 快速开始
 
@@ -28,10 +28,12 @@ pnpm install
 pnpm dev         # 示例中心 + Vue/React 页（Vite，默认 5183 端口）
 pnpm docs:dev    # 文档站（VitePress：安装/活示例/API）
 pnpm docs:build  # 文档站静态产物（apps/docs/.vitepress/dist，可托管任意静态服务）
-pnpm test        # vitest（core 105 例）
+pnpm test        # Vitest（core + Vue + React）
 pnpm lint        # eslint
-pnpm build       # tsup 构建三包（ESM + CJS）
+pnpm build       # 三包（ESM + CJS + d.ts）及 demo、docs
 ```
+
+仓库开发要求 Node 22.20+（22.x）或 ≥24.12、pnpm 10.15.0；这是锁文件中的构建工具要求，消费库的框架版本为 Vue 3 / React 18、19。
 
 ## 原生使用（@d3-tree/core）
 
@@ -102,7 +104,7 @@ export function Chart({ data }) {
 }
 ```
 
-`data` 变化走 `setData`（保留实例）；其余配置 props 变化自动重建实例（实例内的缩放/搜索/展开状态会随之重置）；回调始终读最新闭包。
+`data` 变化走 `setData`（保留实例和缩放，重置搜索、折叠/释放与分组过滤，忽略旧异步加载响应）。React 事件回调始终读最新闭包，悬停回调身份变化不重建，`toggleOnNodeClick` 热更新；切换自接管模式与其余配置 props 变化会重建。Vue 的 `toggleOnNodeClick` 热更新，条件增加/删除 `#tooltip` 插槽会重建并正确回退默认内容。
 
 ## 开源治理
 
@@ -143,9 +145,9 @@ interface TreeNodeData {
 | `linkColor` | `string \| (link) => string` / `'#C0C4CC'` | 连线颜色：颜色串或按连线两端信息（source/target 的 data/几何等）返回 |
 | `linkWidth` | `number` / `1` | 连线宽度（px） |
 | `linkPathGenerator` | `(link) => string` | 完全自定义连线：返回 SVG path 的 d，优先于 linkStyle（不做形变插值） |
-| `colorByGroup` | `boolean` / `false` | 按 group 调色板着色（白字） |
+| `colorByGroup` | `boolean` / `false` | 按 group 调色板着色（十六进制背景自动选择高对比黑/白字） |
 | `nodeColor` | `(node) => string` | 自定义节点填充，优先于分组色 |
-| `tooltip.formatter` | `(node, ctx) => string \| HTMLElement` | 悬浮框内容：HTML 字符串或 DOM 元素（可承载组件宿主）；默认名称 + properties 键值表（自动转义）；ctx 为 `{ depth, side, collapsed }`。悬浮框锚定节点（不随光标）、内容尺寸变化自动重定位、内容可交互（移入弹窗不消失，移出后约 150ms 防抖隐藏）；Vue 用 `#tooltip` 插槽、React 用 `renderTooltip` render-prop 可直接传组件（封装层托管单实例） |
+| `tooltip.formatter` | `(node, ctx) => string \| HTMLElement` | 悬浮框内容：HTML 字符串或 DOM 元素（可承载组件宿主）；默认名称 + properties 键值表（自动转义）；ctx 为 `{ depth, side, collapsed, element, aggregate }`。悬浮框锚定节点（不随光标）、内容尺寸变化自动重定位、内容可交互（移入弹窗不消失，移出后约 150ms 防抖隐藏）；Vue 用 `#tooltip` 插槽、React 用 `renderTooltip` render-prop 可直接传组件（封装层托管单实例） |
 | `tooltip.className` | `string` | 追加到悬浮层的 class（内置外壳保留，覆盖内联样式需 `!important`） |
 | `tooltip.showDelay` | `number` / `0` | 移入节点后的显示延时（毫秒）：悬停停留才出现（扫过节点不弹窗），期间移出取消、换节点重启；`0` 即刻显示 |
 | `tooltip.hideDelay` | `number` / `150` | 移出节点/弹窗后的防抖隐藏延时（毫秒）：期间移入弹窗取消隐藏；`0` 移出即藏（仍走淡出） |
@@ -164,7 +166,7 @@ interface TreeNodeData {
 
 | 方法 | 说明 |
 | --- | --- |
-| `setData(data)` | 整体替换数据并过渡 |
+| `setData(data)` | 整体替换数据并过渡；清搜索/旧请求，重置折叠、释放及分组过滤，保留缩放 |
 | `toggle(id)` | 切换折叠态（根不可折叠） |
 | `expandAll()` / `collapseAll()` | 全展开（含释放聚合）/ 收起至一级板块 |
 | `addChild(parentId, node, side?)` | 追加子节点；父为根时可指定分侧；折叠父自动展开 |
@@ -177,11 +179,17 @@ interface TreeNodeData {
 
 ## 视觉定制
 
-默认视觉对齐企业图谱参考稿：根节点 `#1E6EFF` 蓝底白字加大、普通节点白底 `#DCDFE6` 描边、连线 `#C0C4CC` 直角折线、`+/−` 徽标与"展开 (N)"聚合节点。渲染元素均携带稳定类名（`d3t-node--root|node|aggregate`、`d3t-side--left|right`、`d3t-group--<group>`、`d3t-hit`、`d3t-dimmed` 等），可直接用 CSS 覆盖样式。
+默认视觉对齐企业图谱参考稿：根节点 `#1E6EFF` 蓝底白字加大、普通节点白底 `#DCDFE6` 描边、连线 `#C0C4CC` 直角折线、`+/−` 徽标与"展开 (N)"聚合节点。渲染元素均携带稳定类名（`d3t-node--root|node|aggregate`、`d3t-side--left|right|center`、`d3t-group--<group>`、`d3t-hit`、`d3t-dimmed` 等），可直接用 CSS 覆盖样式。
+
+分组类名保留 ASCII 字母、数字、`_`、`-`，其他连续字符替换为 `-` 并追加原名的 base36 哈希。例如中文 `产业` 对应 `d3t-group----3w9nq`；不要把原始中文组名直接作为选择器，实际类名可在节点 DOM 查看。
+
+基础无障碍提供 tree 所有权、显式层级/同层位置和 Enter/Space 激活，聚合操作也作为 treeitem；尚未实现方向键导航与 roving tabindex。加载脉冲尊重减少动态效果偏好，默认聚合/徽标文字使用更深灰。
 
 ### 节点内容完全自定义
 
 需要图标、头像、多行、富内容时，三个 options 完全接管节点（优先级 `nodeRenderer` > `nodeTemplate` > 默认渲染；`+/−` 徽标、折叠动画、连线、tooltip、搜索、导出在自定义模式下全部继续工作）：
+
+每次数据/布局重绘会重新调用渲染回调，旧内容子组被替换；`group` 不含库管理的徽标。`nodeRenderer` 可返回清理函数以卸载组件或监听器，刷新/退出/销毁时调用。缩放/平移不重绘内容。HTML 模板的不可信字段需由调用端转义。
 
 ```ts
 // 1) 几何：nodeSize 决定宽高（布局/连线/包围盒随之适配）
