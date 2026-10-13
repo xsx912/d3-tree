@@ -1,7 +1,7 @@
 import { select } from 'd3-selection'
 import { zoom, ZoomTransform, zoomTransform } from 'd3-zoom'
 import 'd3-transition' // 副作用：为 selection 注册 .transition()
-import { computeLayout, degenerateLinkPath, linkPath } from './layout'
+import { animationAnchor, computeLayout, degenerateLinkPath, linkPath } from './layout'
 import type { LayoutLink, LayoutNode, LayoutResult } from './layout'
 import { createCanvasMeasurer } from './measure'
 import { theme } from './theme'
@@ -618,8 +618,12 @@ export function createBidirectionalTree(
   let visibleGroups: Set<string> | null = null
   /** 分组 → 调色板颜色（setData 时重算） */
   let groupColors = new Map<string, string>()
-  /** 上一帧渲染的节点位置（key → 中心点），供 enter 过渡起点与 exit 收拢目标使用 */
-  const positions = new Map<string, Position>()
+  /**
+   * 上一帧渲染的节点（key → 布局节点），供动画锚点（末端边缘中点）计算取旧几何。
+   * 存整个 LayoutNode 引用：computeLayout 每帧全新建对象，引用不会被后续渲染污染；
+   * 若将来引入布局缓存/原地改写，此处须改存几何快照。
+   */
+  const lastNodes = new Map<string, LayoutNode>()
 
   function computeGroupColors(data: TreeNodeData): Map<string, string> {
     const colors = new Map<string, string>()
@@ -865,11 +869,15 @@ export function createBidirectionalTree(
     gChart.attr('transform', `translate(${width / 2},${height / 2})`)
 
     const animate = duration > 0 && sourceKey !== undefined
-    const sourceOld = sourceKey !== undefined ? positions.get(sourceKey) : undefined
+    const sourceOld = sourceKey !== undefined ? lastNodes.get(sourceKey) : undefined
     const sourceNew =
       sourceKey !== undefined ? layout.nodes.find(n => n.key === sourceKey) : undefined
-    const start: Position = sourceOld ?? { x: 0, y: 0 }
-    const end: Position = sourceNew ? { x: sourceNew.x, y: sourceNew.y } : start
+    // 动画锚点取父节点「朝子节点一侧」的边缘中点（连线发出点）；
+    // 未知源（首帧后仍无记录的兜底）沿用根中心 (0,0)
+    const start: Position = sourceOld
+      ? animationAnchor(sourceOld, orientation)
+      : { x: 0, y: 0 }
+    const end: Position = sourceNew ? animationAnchor(sourceNew, orientation) : start
 
     // ---- 连线 ----
     const link = gLink
@@ -964,21 +972,22 @@ export function createBidirectionalTree(
           activateNode(event, d)
         }
       })
-      .on('mouseenter', function (_event, d) {
+      .on('mouseenter', (event, d) => {
+        // currentTarget 仅事件分发期间有效：同步捕获，延时回调里才能继续引用
+        const element = event.currentTarget as SVGGElement
         if (options.onNodeHover) {
           // 自接管模式：只发事件，内置悬浮框停用
           hoverLastNode = d
-          options.onNodeHover(d.data, buildHoverCtx(d, this))
+          options.onNodeHover(d.data, buildHoverCtx(d, element))
         } else if (tooltipShowDelay > 0) {
           // 显示延时：悬停停留才出现（扫过节点不弹窗），换节点重启计时
           cancelTooltipShow()
-          const el = this
           tooltipShowTimer = setTimeout(() => {
             tooltipShowTimer = null
-            showTooltip(d, el)
+            showTooltip(d, element)
           }, tooltipShowDelay)
         } else {
-          showTooltip(d, this)
+          showTooltip(d, element)
         }
       })
       .on('mouseleave', function () {
@@ -1120,8 +1129,8 @@ export function createBidirectionalTree(
     if (searchState) applySearchClasses(searchState)
 
     lastLayout = layout
-    positions.clear()
-    for (const n of layout.nodes) positions.set(n.key, { x: n.x, y: n.y })
+    lastNodes.clear()
+    for (const n of layout.nodes) lastNodes.set(n.key, n)
   }
 
   // 容器尺寸就绪或变化时重新居中（修复挂载早于布局时的偏移，如 Vue onMounted 场景）
@@ -1153,7 +1162,7 @@ export function createBidirectionalTree(
       revealed = new Map()
       visibleGroups = null
       groupColors = computeGroupColors(data)
-      positions.clear()
+      lastNodes.clear()
       emitGroups()
       render(sourceKey)
     },

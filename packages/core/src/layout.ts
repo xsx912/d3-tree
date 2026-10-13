@@ -56,6 +56,22 @@ export interface LayoutLink {
   target: LayoutNode
 }
 
+/**
+ * 展开/收起动画源锚点：节点「朝子节点一侧」的边缘中点（连线发出点）。
+ * 左枝取左缘、右枝取右缘；垂直布局转置到外缘；根节点（center）回退节点中心。
+ * 与 linkPath 的连线端点公式一致，保证子树自连线发出处长出/收拢。
+ */
+export function animationAnchor(
+  n: { x: number; y: number; width: number; height: number; side: Side | 'center' },
+  orientation: Orientation,
+): { x: number; y: number } {
+  if (n.side === 'center') return { x: n.x, y: n.y }
+  const dir = n.side === 'left' ? -1 : 1
+  return orientation === 'vertical'
+    ? { x: n.x, y: n.y + (dir * n.height) / 2 }
+    : { x: n.x + (dir * n.width) / 2, y: n.y }
+}
+
 export interface LayoutBounds {
   minX: number
   maxX: number

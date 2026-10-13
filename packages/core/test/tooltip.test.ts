@@ -623,7 +623,7 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
         tree.destroy()
         expect(ro!.observed).toHaveLength(0) // disconnect 清空观察目标
 
-        let height = 120
+        const height = 120
         Object.defineProperty(tip, 'offsetHeight', { get: () => height, configurable: true })
         ro!.trigger() // 已断开：不再通知，位置保持
         expect(tip.style.top).toBe(before)

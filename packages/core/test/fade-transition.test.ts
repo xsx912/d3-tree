@@ -1,29 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-
-/**
- * jsdom 未实现 SVGElement#transform（baseVal），d3-interpolate 解析 transform 过渡即崩。
- * 补一个只支持 translate(x,y) 的最小 consolidate（本文件 transform 均为该形式），
- * 让位移过渡在 jsdom 里真实运行；仅影响本文件的 jsdom 实例。
- */
-function polyfillSvgTransform(): void {
-  if ('transform' in SVGElement.prototype) return
-  Object.defineProperty(SVGElement.prototype, 'transform', {
-    configurable: true,
-    get() {
-      return {
-        baseVal: {
-          consolidate: () => {
-            const m = /translate\(([-\d.eE+]+)[, ]([-\d.eE+]+)\)/.exec(
-              this.getAttribute('transform') ?? '',
-            )
-            const [, xs, ys] = m ?? []
-            return { matrix: { a: 1, b: 0, c: 0, d: 1, e: Number(xs ?? 0), f: Number(ys ?? 0) } }
-          },
-        },
-      }
-    },
-  })
-}
+import { polyfillSvgTransform } from './helpers'
 
 /**
  * 淡入淡出的过渡过程测试。

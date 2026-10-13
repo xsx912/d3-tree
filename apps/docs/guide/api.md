@@ -13,7 +13,7 @@ function createBidirectionalTree(container: HTMLElement, options: TreeOptions): 
 | 选项 | 类型 / 默认值 | 说明 |
 | --- | --- | --- |
 | `data` | `TreeNodeData`（必填） | 层级数据，见[数据模型](/guide/install#数据模型) |
-| `duration` | `number` / `250` | 过渡动画时长（ms），`0` 关闭动画 |
+| `duration` | `number` / `250` | 过渡动画时长（ms），`0` 关闭动画。展开/收起的位移过渡自被操作父节点「朝子节点一侧」的边缘中点出发并收拢回该点（初始全量生长自根节点中心） |
 | `fadeOpacity` | `number` / `0.25` | 展开/收起的淡入淡出透明度（0~1，超出钳制）：展开时新节点与连线从该值淡入至 1，收起时淡出至该值后移除；传 `1` 关闭淡入淡出（纯位移动画） |
 | `rowHeight` | `number` / `48` | 兄弟轴步距（垂直模式下语义为兄弟水平间距） |
 | `columnGap` | `number` / `48` | 深度轴列/行间距 |
