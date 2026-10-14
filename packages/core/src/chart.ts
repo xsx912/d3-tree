@@ -243,6 +243,8 @@ export function createBidirectionalTree(
     lineHeight: '1.7',
     maxWidth: '280px',
   } satisfies Partial<CSSStyleDeclaration>)
+  // 贴侧空间不足时动态收缩卡宽的恢复基准（容器变宽后据此复原）
+  const tooltipBaseMaxWidth = tooltipEl.style.maxWidth
   if (tooltipFadeDuration > 0) tooltipEl.style.transition = `opacity ${tooltipFadeDuration}ms ease`
   container.appendChild(tooltipEl)
 
@@ -373,19 +375,46 @@ export function createBidirectionalTree(
    * · 折叠手柄伸到节点外侧 (badgeRadius*2+3) 布局单位处，外侧间隙按 k 计入其外缘；
    * · 与其他节点重叠时按姿态优先级避让（零遮挡即采纳，始终保持"贴锚"不变式）：
    *   外侧贴合小滑移 → 内侧贴合小滑移 → 正交贴合（主轴与锚对齐、贴锚上/下边缘）→
-   *   外侧大范围滑移取最小遮挡（兜底）。连线不做避让。
-   * 布局坐标 → 容器像素：gChart 居中平移 (w/2,h/2) 与 gZoom 缩放变换复合。
+   *   外侧大范围滑移取最小遮挡（兜底；零遮挡位飘离锚点且贴锚仅轻微遮挡时，
+   *   宁可轻微擦边也贴锚）。连线不做避让。
+   * 布局坐标 → 容器像素：gChart 实际居中平移（容器 resize 后 RO 更新可能有延迟，
+   * 读实际值与节点视觉保持一致）与 gZoom 缩放变换复合。
    */
   function positionTooltip(): void {
     const d = tooltipAnchor
     if (!d || tooltipEl.style.display === 'none') return
     const { width: cw, height: ch } = size()
     const { k, x: tx, y: ty } = zoomTransform(svg.node()!)
-    const cx = k * (cw / 2 + d.x) + tx
-    const cy = k * (ch / 2 + d.y) + ty
-    const w = tooltipEl.offsetWidth
-    const h = tooltipEl.offsetHeight
+    // 读 gChart 实际居中平移而非假设 (cw/2,ch/2)：容器 resize 后 RO 通知可能延迟，
+    // gChart 停留旧值期间节点视觉位置由它决定——定位跟着实际 transform 走才不与视觉错位
+    const chartT = /translate\(([-\d.]+)[, ]([-\d.]+)\)/.exec(gChart.attr('transform') ?? '')
+    const ox = chartT ? Number(chartT[1]) : cw / 2
+    const oy = chartT ? Number(chartT[2]) : ch / 2
+    const cx = k * (ox + d.x) + tx
+    const cy = k * (oy + d.y) + ty
+    let w = tooltipEl.offsetWidth
+    let h = tooltipEl.offsetHeight
     const GAP = 12
+    // 贴侧空间不足时收缩卡宽（内容换行增高），避免钳制位横跨锚点：取外侧与内侧
+    // 更宽一侧收缩，让 place 的翻侧贴合可行；窄于 160 不收缩（保持键值表可读）。
+    // 每次先恢复基准 maxWidth 再按当前容器重新收缩，容器变宽后能复原
+    tooltipEl.style.maxWidth = tooltipBaseMaxWidth
+    w = tooltipEl.offsetWidth
+    h = tooltipEl.offsetHeight
+    {
+      const vert = options.orientation === 'vertical'
+      const halfMain = vert ? (d.height * k) / 2 : (d.width * k) / 2
+      const mainCenter = vert ? cy : cx
+      const total = vert ? ch : cw
+      const sideFit = Math.floor(
+        Math.max(mainCenter - halfMain - GAP - 4, total - 2 - (mainCenter + halfMain + GAP)),
+      )
+      if (w > sideFit && sideFit >= 160) {
+        tooltipEl.style.maxWidth = `${sideFit}px`
+        w = tooltipEl.offsetWidth
+        h = tooltipEl.offsetHeight
+      }
+    }
     // 手柄只朝外侧（与悬浮层同侧）；对侧放置无需让
     const hasHandle =
       d.variant === 'node' &&
@@ -445,8 +474,8 @@ export function createBidirectionalTree(
       const pad = Math.max(w, h) + SLIDE_MAX + 4 * GAP
       for (const n of lastNodes.values()) {
         if (n.key === d.key) continue
-        const nx = k * (cw / 2 + n.x) + tx
-        const ny = k * (ch / 2 + n.y) + ty
+        const nx = k * (ox + n.x) + tx
+        const ny = k * (oy + n.y) + ty
         const halfW = (n.width * k) / 2
         const halfH = (n.height * k) / 2
         if (
@@ -514,8 +543,17 @@ export function createBidirectionalTree(
             mainPos = aligned
             crossPos = second
           } else {
-            // 4 兜底：外侧大范围滑移取最小遮挡（连线不做避让）
-            crossPos = slideNear(m.pos, c.pos, SLIDE_MAX).pos
+            // 4 兜底：外侧大范围滑移取零遮挡/最小遮挡（连线不做避让）。零遮挡位飘离
+            // 锚点超过 FAR_SLIDE、而贴锚范围仅有轻微遮挡（<卡片面积 1/5，只擦到节点
+            // 边缘一小条）时，宁可轻微擦边也保持贴锚——卡片与锚的视觉关联优先于完美避让
+            const FAR_SLIDE = 60
+            const far = slideNear(m.pos, c.pos, SLIDE_MAX)
+            crossPos =
+              far.cost === 0 &&
+              Math.abs(far.pos - c.pos) > FAR_SLIDE &&
+              outNear.cost < (w * h) / 5
+                ? outNear.pos
+                : far.pos
           }
         }
       }
@@ -1341,12 +1379,14 @@ export function createBidirectionalTree(
     for (const n of layout.nodes) lastNodes.set(n.key, n)
   }
 
-  // 容器尺寸就绪或变化时重新居中（修复挂载早于布局时的偏移，如 Vue onMounted 场景）
+  // 容器尺寸就绪或变化时重新居中（修复挂载早于布局时的偏移，如 Vue onMounted 场景），
+  // 并同步重定位已显示的悬浮层——节点视觉位置随 gChart 平移，悬浮层须跟随
   let resizeObserver: ResizeObserver | undefined
   if (typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver(() => {
       const { width, height } = size()
       gChart.attr('transform', `translate(${width / 2},${height / 2})`)
+      positionTooltip()
     })
     resizeObserver.observe(container)
   }

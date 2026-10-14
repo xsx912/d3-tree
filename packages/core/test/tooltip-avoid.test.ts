@@ -294,6 +294,25 @@ describe('悬浮层遮挡避让（尺寸保持屏幕恒定）', () => {
     })
   })
 
+  describe('坐标系自洽（容器 resize 后 RO 更新延迟）', () => {
+    it('定位读 gChart 实际居中平移，与节点视觉位置一致', () => {
+      const { container } = mount(baseFixture())
+      // 模拟容器 resize 后 RO 通知延迟：gChart 停留旧平移（如 (500,500) 而非 (400,300)），
+      // 节点视觉位置由 gChart 决定——悬浮层定位必须跟着实际值走而非假设当前容器半宽。
+      // 锚选叶子 a1（外侧空旷零遮挡，定位即纯坐标换算，不进避让姿态分支）
+      container.querySelector('g.d3t-chart')!.setAttribute('transform', 'translate(500,500)')
+      mockTipSize(container, 80, 36)
+      const a1 = nodeById(container, 'a1')
+      const box = nodeBox(container, 'a1')
+      hover(a1)
+      const left = parseFloat(tooltipEl(container).style.left)
+      const top = parseFloat(tooltipEl(container).style.top)
+      // 叶子无手柄：间隙为 GAP；y 垂直居中于按 gChart 实际平移换算的节点中心
+      expect(left).toBeCloseTo(500 + box.x - box.width / 2 - GAP - 80, 5)
+      expect(top).toBeCloseTo(500 + box.y - 18, 5)
+    })
+  })
+
   describe('垂直布局对称', () => {
     it('垂直布局：手柄避让与滑移避让同样生效', () => {
       const k = 0.5
