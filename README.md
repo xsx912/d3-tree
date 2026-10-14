@@ -149,7 +149,7 @@ interface TreeNodeData {
 | `nodeColor` | `(node) => string` | 自定义节点填充，优先于分组色 |
 | `tooltip.formatter` | `(node, ctx) => string \| HTMLElement` | 悬浮框内容：HTML 字符串或 DOM 元素（可承载组件宿主）；默认名称 + properties 键值表（自动转义）；ctx 为 `{ depth, side, collapsed, element, aggregate }`。悬浮框锚定节点（不随光标）、内容尺寸变化自动重定位、内容可交互（移入弹窗不消失，移出后约 150ms 防抖隐藏）；Vue 用 `#tooltip` 插槽、React 用 `renderTooltip` render-prop 可直接传组件（封装层托管单实例） |
 | `tooltip.className` | `string` | 追加到悬浮层的 class（内置外壳保留，覆盖内联样式需 `!important`） |
-| `tooltip.showDelay` | `number` / `0` | 移入节点后的显示延时（毫秒）：悬停停留才出现（扫过节点不弹窗），期间移出取消、换节点重启；`0` 即刻显示 |
+| `tooltip.showDelay` | `number` / `300` | 移入节点后的显示延时（毫秒）：悬停停留才出现（扫过节点不弹窗），期间移出取消、换节点重启；`0` 即刻显示 |
 | `tooltip.hideDelay` | `number` / `150` | 移出节点/弹窗后的防抖隐藏延时（毫秒）：期间移入弹窗取消隐藏；`0` 移出即藏（仍走淡出） |
 | `tooltip.fadeDuration` | `number` / `150` | 显示/隐藏淡入淡出时长（毫秒，`0` 关闭过渡）；"减少动态效果"偏好下未显式配置时为 0；淡出完成才触发 `onTooltipHide` |
 | `tooltip.onTooltipHide` | `() => void` | 悬浮层隐藏时回调（移出/重渲染；destroy 不触发）。Vue `#tooltip` 插槽 / React `renderTooltip` 配 `tooltip-cache`/`tooltipCache: false` 可关闭内容组件实例缓存（每次悬停全新挂载、隐藏即卸载） |

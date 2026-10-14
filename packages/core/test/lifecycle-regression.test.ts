@@ -44,6 +44,17 @@ describe('资源与尺寸回归', () => {
     await vi.advanceTimersByTimeAsync(1)
     expect(tooltip.style.display).toBe('none')
   })
+  it('showDelay 缺省为 300：悬停停留 300ms 才显示，设 0 回到即刻显示', async () => {
+    vi.useFakeTimers()
+    const container = mount({ tooltip: {} })
+    const item = container.querySelector('g[data-id="a"]')!
+    const tooltip = container.querySelector<HTMLElement>('.d3t-tooltip')!
+    item.dispatchEvent(new MouseEvent('mouseenter'))
+    await vi.advanceTimersByTimeAsync(299)
+    expect(tooltip.style.display).toBe('none')
+    await vi.advanceTimersByTimeAsync(1)
+    expect(tooltip.style.display).toBe('block')
+  })
   it('默认分组、聚合和徽标文字与背景对比度达到 4.5', () => {
     const luminance = (hex: string) => {
       const channels = [1, 3, 5].map((index) => {

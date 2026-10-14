@@ -108,6 +108,7 @@ it('动态 hoverEnd 和自接管模式切换正确；StrictMode 无重复实例'
             data,
             duration: 0,
             measureText,
+            tooltipShowDelay: 0, // 该用例同步断言 tooltip 显示：归零与 core 默认值解耦
             onNodeHover: enabled ? onNodeHover : undefined,
             onNodeHoverEnd: end ? onNodeHoverEnd : undefined,
           }),

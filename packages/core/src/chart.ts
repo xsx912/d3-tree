@@ -217,7 +217,7 @@ export function createBidirectionalTree(
     container.style.position = 'relative'
   }
   /** 悬浮框显隐节奏：移入显示延时/移出防抖延时与淡入淡出时长（"减少动态效果"偏好下未显式配置时无过渡） */
-  const tooltipShowDelay = Math.max(0, options.tooltip?.showDelay ?? 0)
+  const tooltipShowDelay = Math.max(0, options.tooltip?.showDelay ?? 300)
   const tooltipHideDelay = Math.max(0, options.tooltip?.hideDelay ?? 150)
   const tooltipFadeDuration = Math.max(
     0,

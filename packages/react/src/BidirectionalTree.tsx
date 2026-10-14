@@ -58,7 +58,7 @@ export interface BidirectionalTreeProps {
    * 组件状态不跨悬停留、effect cleanup 即时触发。
    */
   tooltipCache?: boolean
-  /** 移入节点后的显示延时（毫秒，默认 0 即刻显示）：悬停停留才出现，扫过节点不弹窗 */
+  /** 移入节点后的显示延时（毫秒，默认 300）：悬停停留才出现，扫过节点不弹窗；0 即刻显示 */
   tooltipShowDelay?: number
   /** 移出节点/弹窗后的防抖隐藏延时（毫秒，默认 150）：期间移入弹窗取消隐藏；0 移出即藏 */
   tooltipHideDelay?: number

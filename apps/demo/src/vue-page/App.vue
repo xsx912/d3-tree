@@ -93,7 +93,7 @@ async function exportGraph(format: 'svg' | 'png'): Promise<void> {
 
 // ---- 悬浮框实例缓存验证（#tooltip 插槽 + tooltipCache 开关） ----
 const tooltipCache = ref(true)
-const tipShowDelay = ref(0)
+const tipShowDelay = ref(300)
 const tipHideDelay = ref(150)
 const tipFadeDuration = ref(150)
 const tipMounts = ref(0)

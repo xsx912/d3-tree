@@ -72,6 +72,8 @@ it.each([true, false])('条件插槽有→无→有安全回退和清理，缓�
           data,
           duration: 0,
           measureText,
+          // 该用例 nextTick 后同步断言 tooltip 内容：归零与 core 默认值解耦
+          tooltipShowDelay: 0,
           tooltipCache,
         },
         shown.value ? { tooltip: () => h(Content, { version: version.value }) } : {},

@@ -60,7 +60,7 @@ export default function App() {
 
   // ---- 悬浮框实例缓存验证（renderTooltip + tooltipCache 开关） ----
   const [tooltipCache, setTooltipCache] = useState(true)
-  const [tipShowDelay, setTipShowDelay] = useState(0)
+  const [tipShowDelay, setTipShowDelay] = useState(300)
   const [tipHideDelay, setTipHideDelay] = useState(150)
   const [tipFadeDuration, setTipFadeDuration] = useState(150)
   const [tipMounts, setTipMounts] = useState(0)

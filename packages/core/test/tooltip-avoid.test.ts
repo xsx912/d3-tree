@@ -19,6 +19,8 @@ function mount(
     measureText: fixedMeasure,
     duration: 0,
     ...extra,
+    // 本文件聚焦避让几何：showDelay 归零让悬停同步显示，与 core 默认值解耦
+    tooltip: { showDelay: 0, ...(extra.tooltip as object | undefined) },
   })
   return { container, tree }
 }
