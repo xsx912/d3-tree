@@ -216,6 +216,41 @@ describe('悬浮层遮挡避让（尺寸保持屏幕恒定）', () => {
       expect(rect.bottom).toBeLessThanOrEqual(598)
     })
 
+    it('外侧被子节点列占满时换贴锚姿态，不大滑移飘离锚点', () => {
+      // k=1 且卡片宽 130 > 列间空隙：外侧贴合横跨子节点列，内侧又贴到根——
+      // 旧行为沿正交轴大滑移约百像素，卡片视觉上"飞离"锚点（demo 实测回归）
+      const { container } = mount(baseFixture())
+      mockTipSize(container, 130, 60)
+      const a = nodeById(container, 'a')
+      hover(a)
+      const tip = tooltipEl(container)
+      const rect = tipRect(tip)
+      const anchor = screenBox(nodeBox(container, 'a'), 1, 0, 0)
+
+      // 前置自证：外侧垂直居中的初位置确实与子节点列重叠，避让逻辑被真实触发
+      const initial = {
+        left: anchor.left - (GAP + HANDLE_EXTENT) - 130,
+        top: (anchor.top + anchor.bottom) / 2 - 30,
+        right: anchor.left - (GAP + HANDLE_EXTENT),
+        bottom: (anchor.top + anchor.bottom) / 2 + 30,
+      }
+      const kidBoxes = ['a1', 'a2'].map((id) => screenBox(nodeBox(container, id), 1, 0, 0))
+      expect(
+        kidBoxes.reduce((sum, b) => sum + overlapArea(initial, b), 0),
+        '前置条件：初位置应与子节点列重叠',
+      ).toBeGreaterThan(0)
+
+      // 断言 1：与所有非锚节点零遮挡
+      for (const id of ['a1', 'a2', 'root', 'b', 'b1']) {
+        const node = screenBox(nodeBox(container, id), 1, 0, 0)
+        expect(overlapArea(rect, node), `悬浮层不应遮挡节点 ${id}`).toBe(0)
+      }
+      // 断言 2：贴锚不变式——卡片到锚的矩形间距不超过外侧贴合间隙（手柄让位后的正常间隙）
+      const dx = Math.max(anchor.left - rect.right, rect.left - anchor.right, 0)
+      const dy = Math.max(anchor.top - rect.bottom, rect.top - anchor.bottom, 0)
+      expect(Math.hypot(dx, dy)).toBeLessThanOrEqual(GAP + HANDLE_EXTENT + 1)
+    })
+
     it('无处零遮挡时回退最小遮挡且钳制在视口内', () => {
       // 16 个子节点密排成整列：滑移范围内找不到零遮挡位
       const data: TreeNodeData = {
