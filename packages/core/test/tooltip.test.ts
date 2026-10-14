@@ -235,7 +235,8 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
 
       const tip = tooltipEl(container)
       // jsdom：size() 回落 800×600、gChart 平移 (400,300)、zoom 恒等
-      expect(parseFloat(tip.style.left)).toBeCloseTo(400 + box.x + box.width / 2 + 12, 5)
+      // b 带子节点：外侧间隙 = GAP 12 + 手柄外缘 17（badgeRadius*2+3）×k，k=1 即 29
+      expect(parseFloat(tip.style.left)).toBeCloseTo(400 + box.x + box.width / 2 + 12 + 17, 5)
       expect(parseFloat(tip.style.top)).toBeCloseTo(300 + box.y, 5)
     })
 
@@ -246,8 +247,9 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
       const box = nodeBox(a)
       hover(a)
 
+      // a 带子节点：外侧间隙含手柄外缘 17（k=1）
       expect(parseFloat(tooltipEl(container).style.left)).toBeCloseTo(
-        400 + box.x - box.width / 2 - 12,
+        400 + box.x - box.width / 2 - 12 - 17,
         5,
       )
     })
@@ -295,7 +297,8 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
         container.querySelector('g.d3t-zoom')!.getAttribute('transform') ?? '',
       )!
       const [tx, k] = [Number(m[1]), Number(m[3])]
-      expect(now).toBeCloseTo(k * (400 + box.x) + tx + (box.width * k) / 2 + 12, 5)
+      // b 带子节点：外侧间隙 = 12 + 手柄外缘 17×k
+      expect(now).toBeCloseTo(k * (400 + box.x) + tx + (box.width * k) / 2 + 12 + 17 * k, 5)
     })
 
     it('垂直布局：上侧节点悬浮层出现在节点上方', () => {
@@ -306,7 +309,8 @@ describe('悬浮框自定义内容（formatter 组件化）', () => {
       hover(a)
 
       const tip = tooltipEl(container)
-      expect(parseFloat(tip.style.top)).toBeCloseTo(300 + box.y - box.height / 2 - 12, 5)
+      // a 带子节点：上方间隙含手柄外缘 17（k=1）
+      expect(parseFloat(tip.style.top)).toBeCloseTo(300 + box.y - box.height / 2 - 12 - 17, 5)
     })
 
     it('垂直布局：根节点（center）悬浮层出现在下方（根随下侧，同水平布局根随右侧惯例）', () => {

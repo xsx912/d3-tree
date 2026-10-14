@@ -369,6 +369,10 @@ export function createBidirectionalTree(
   /**
    * 锚定定位：悬浮层贴节点外侧（水平布局：左节点→左侧、右/根→右侧；
    * 垂直布局：上侧→上方、下侧与根→下方），放不下时翻到另一侧，仍放不下才钳制。
+   * 尺寸保持屏幕恒定（不随缩放缩放），因此两类遮挡按缩放系数 k 补偿：
+   * · 折叠手柄伸到节点外侧 (badgeRadius*2+3) 布局单位处，外侧间隙按 k 计入其外缘；
+   * · 缩小后节点屏距变窄而悬浮层不变，与锚外侧的子节点列重叠时沿正交轴滑移
+   *   寻找零遮挡位（滑尽仍遮挡则取遮挡面积最小者）；连线不做避让。
    * 布局坐标 → 容器像素：gChart 居中平移 (w/2,h/2) 与 gZoom 缩放变换复合。
    */
   function positionTooltip(): void {
@@ -381,8 +385,13 @@ export function createBidirectionalTree(
     const w = tooltipEl.offsetWidth
     const h = tooltipEl.offsetHeight
     const GAP = 12
+    // 手柄只朝外侧（与悬浮层同侧）；对侧放置无需让
+    const hasHandle =
+      d.variant === 'node' &&
+      (!!d.data.children?.length || (d.data.hasChildren === true && !d.data.children?.length))
+    const outwardGap = GAP + (hasHandle ? (t.badgeRadius * 2 + 3) * k : 0)
     const clamp = (v: number, min: number, max: number): number => Math.min(Math.max(v, min), max)
-    /** 沿轴放置：先外侧，溢出则翻对侧（对侧完全放得下才翻），最后钳制 */
+    /** 沿轴放置：先外侧（间隙让过手柄），溢出则翻对侧（对侧完全放得下才翻），最后钳制 */
     const place = (
       center: number,
       halfExtent: number,
@@ -390,12 +399,27 @@ export function createBidirectionalTree(
       total: number,
       outward: boolean,
     ): number => {
-      let pos = outward ? center + halfExtent + GAP : center - halfExtent - GAP - box
+      let pos = outward
+        ? center + halfExtent + outwardGap
+        : center - halfExtent - outwardGap - box
       if (pos < 2 || pos + box > total - 2) {
         const flipped = outward ? center - halfExtent - GAP - box : center + halfExtent + GAP
         if (flipped >= 2 && flipped + box <= total - 2) pos = flipped
       }
       return clamp(pos, 2, Math.max(2, total - box - 2))
+    }
+    /** 视口内其他节点的屏幕盒（粗筛到悬浮层附近条带），供避让计算 */
+    const others: { left: number; top: number; right: number; bottom: number }[] = []
+    // 滑移总上限：近处（≤1 步进倍数）零遮挡即提前退出；大卡片在高密度图中需要更远
+    // 才出现空隙，允许滑出贴锚区换零遮挡（约一个半卡片高的距离）
+    const SLIDE_MAX = 204
+    const overlapArea = (
+      a: { left: number; top: number; right: number; bottom: number },
+      b: { left: number; top: number; right: number; bottom: number },
+    ): number => {
+      const ow = Math.min(a.right, b.right) - Math.max(a.left, b.left)
+      const oh = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
+      return ow > 0 && oh > 0 ? ow * oh : 0
     }
     let x: number
     let y: number
@@ -405,6 +429,56 @@ export function createBidirectionalTree(
     } else {
       x = place(cx, (d.width * k) / 2, w, cw, d.side !== 'left')
       y = clamp(cy - h / 2, 2, Math.max(2, ch - h - 2))
+    }
+    if (w > 0 && h > 0) {
+      const vertical = options.orientation === 'vertical'
+      const along = vertical ? { pos: x, box: w, total: cw } : { pos: y, box: h, total: ch }
+      for (const n of lastNodes.values()) {
+        if (n.key === d.key) continue
+        const nx = k * (cw / 2 + n.x) + tx
+        const ny = k * (ch / 2 + n.y) + ty
+        const halfW = (n.width * k) / 2
+        const halfH = (n.height * k) / 2
+        // 粗筛：固定轴上与悬浮层条带不相交（永远遮挡不到），或滑移轴上离初位置超出
+        // 滑移上限（滑过去也不构成遮挡）的节点直接跳过
+        const inFixedBand = vertical
+          ? ny + halfH >= y && ny - halfH <= y + h
+          : nx + halfW >= x && nx - halfW <= x + w
+        const inSlideRange = vertical
+          ? nx + halfW >= x - SLIDE_MAX && nx - halfW <= x + w + SLIDE_MAX
+          : ny + halfH >= y - SLIDE_MAX && ny - halfH <= y + h + SLIDE_MAX
+        if (inFixedBand && inSlideRange)
+          others.push({ left: nx - halfW, top: ny - halfH, right: nx + halfW, bottom: ny + halfH })
+      }
+      /** 沿正交轴滑移：初位置零遮挡直接用；否则向两侧步进找零遮挡位，滑尽取最小遮挡 */
+      const crossRect = (crossPos: number) =>
+        vertical
+          ? { left: crossPos, top: y, right: crossPos + w, bottom: y + h }
+          : { left: x, top: crossPos, right: x + w, bottom: crossPos + h }
+      const cost = (crossPos: number): number => {
+        const r = crossRect(crossPos)
+        return others.reduce((sum, o) => sum + overlapArea(r, o), 0)
+      }
+      const clamped = clamp(along.pos, 2, Math.max(2, along.total - along.box - 2))
+      let best = clamped
+      let bestCost = cost(clamped)
+      if (bestCost > 0) {
+        let bestDist = 0
+        for (let i = 1; i <= SLIDE_MAX / 12 && bestCost > 0; i++) {
+          for (const dir of [1, -1]) {
+            const p = clamp(along.pos + dir * i * 12, 2, Math.max(2, along.total - along.box - 2))
+            const c = cost(p)
+            const dist = Math.abs(p - along.pos)
+            if (c < bestCost || (c === bestCost && dist < bestDist)) {
+              best = p
+              bestCost = c
+              bestDist = dist
+            }
+          }
+        }
+      }
+      if (vertical) x = best
+      else y = best
     }
     tooltipEl.style.left = `${x}px`
     tooltipEl.style.top = `${y}px`
